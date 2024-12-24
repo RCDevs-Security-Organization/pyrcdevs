@@ -1,0 +1,16 @@
+# ignore all root items
+/*
+
+# unignore folders
+!docs/
+!pyrcdevs/
+!tests/
+
+# unignore files
+!.gitignore
+!.python-version
+!__init__.py
+!README.md
+!pyproject.toml
+
+__pycache__

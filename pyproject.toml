@@ -1,0 +1,69 @@
+[tool.poetry]
+name = "pyrcdevs"
+version = "0.1.1"
+description = "Python library for using the RCDevs API (Manager and SOAP APIs)"
+authors = ["Benoît Jager <benoit.jager@rcdevs.com>"]
+readme = "README.md"
+#homepage = "https://www.rcdevs.com/"
+documentation = "https://docs.rcdevs.com/"
+
+[tool.poetry.dependencies]
+python = "^3.8"
+requests = "^2.32.3"
+requests-pkcs12 = "^1.25"
+xmltodict = "^0.14.2"
+
+[tool.poetry.group.test.dependencies]
+pytest = "^8.3.4"
+pytest-env = "^1.1.5"
+coverage = "^7.6"
+tox = "^4.23.2"
+virtualenv-pyenv = "^0.5.0"
+python-ldap = "^3.4.4"
+
+[tool.poetry.group.dev.dependencies]
+black = "^24"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+
+[tool.pytest.ini_options]
+testpaths = [
+    "tests",
+]
+env = [
+    "WEBADM_HOST = pyrcdevs.testing.local",
+    "WEBADM_ADMIN_DN = cn=admin,o=root",
+    "WEBADM_ADMIN_PASSWORD = password",
+    "WEBADM_API_USERNAME = Default\\admin",
+    "WEBADM_API_PASSWORD = password",
+    "SMS_MOBILE = ",
+]
+filterwarnings = [
+    "error",
+    "ignore::urllib3.exceptions.InsecureRequestWarning",
+]
+
+
+[tool.tox]
+legacy_tox_ini = """
+[tox]
+env_list =
+    py{308,309,310,311,312,313}
+
+[testenv]
+description = run the tests with pytest
+commands =
+    pytest {posargs:tests}
+set_env =
+  VIRTUALENV_DISCOVERY = pyenv
+deps =
+    pytest
+    pytest-env
+    coverage
+    virtualenv-pyenv
+    python-ldap
+    xmltodict
+"""
