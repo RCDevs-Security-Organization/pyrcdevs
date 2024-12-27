@@ -3,11 +3,8 @@
 from enum import Enum
 from typing import Any
 
+from pyrcdevs.constants import MSG_NOT_RIGHT_TYPE
 from pyrcdevs.manager.Manager import Manager
-
-MSG_INVALID_STATUS_TYPE = "status type is not InventoryStatus"
-
-MSG_INVALID_PRODUCT_TYPE = "product type is not LicenseProduct"
 
 
 class LDAPSearchScope(Enum):
@@ -282,36 +279,36 @@ class WebADMManager(Manager):
         response = super().handle_api_manager_request("Clear_Caches", params)
         return response
 
-    def count_activated_hosts(self, product=None) -> int:
+    def count_activated_hosts(self, product: LicenseProduct = None) -> int:
         """
         Return how many client hosts are currently counted by the licensing.
 
         If a product ID is provided, WebADM counts only the hosts which are in use for the product.
 
-        :param str product: product ID
+        :param LicenseProduct product: product ID
         :return: number of activated hosts
         :rtype: int
         """
         if product is not None and not isinstance(product, LicenseProduct):
-            raise TypeError(MSG_INVALID_PRODUCT_TYPE)
+            raise TypeError(MSG_NOT_RIGHT_TYPE.format("product", "LicenseProduct"))
         params = {}
         if product is not None:
             params["product"] = product.value
         response = super().handle_api_manager_request("Count_Activated_Hosts", params)
         return response
 
-    def count_activated_users(self, product=None) -> int:
+    def count_activated_users(self, product: LicenseProduct = None) -> int:
         """
         Return how many activated users are currently counted by the licensing.
 
         If a product ID is provided, WebADM counts only the users which are in use for the product.
 
-        :param str product: product ID
+        :param LicenseProduct product: product ID
         :return: number of activated users
         :rtype: int
         """
         if product is not None and not isinstance(product, LicenseProduct):
-            raise TypeError(MSG_INVALID_PRODUCT_TYPE)
+            raise TypeError(MSG_NOT_RIGHT_TYPE.format("product", "LicenseProduct"))
         params = {}
         if product is not None:
             params["product"] = product.value
@@ -371,26 +368,32 @@ class WebADMManager(Manager):
         response = super().handle_api_manager_request("Deactivate_LDAP_Object", params)
         return response
 
-    def get_config_objects(self, type_, settings=None, application=None) -> dict:
+    def get_config_objects(
+        self,
+        type_: ConfigObjectType,
+        settings: bool = None,
+        application: ConfigObjectApplication = None,
+    ) -> list | dict:
         """
         Return configuration of WebADM objects.
 
         :param ConfigObjectType type_: type of object (see ConfigObjectType for possible values)
         :param bool settings: if True, Return all configuration details
         :param ConfigObjectApplication application: application name (see ConfigObjectApplication for possible values)
-        :return: dictionnary of object configuration
-        :rtype: dict
+        :return: a list of object name if settings parameter is False or a dictionnary of object configuration if
+        settings parameter is True
+        :rtype: list | dict
         """
         if not isinstance(type_, ConfigObjectType):
-            raise TypeError("type_ is not of ConfigObjectType type")
-        if application is not None and not isinstance(
-            application, ConfigObjectApplication
-        ):
-            raise TypeError("application type is not ConfigObjectApplication")
+            raise TypeError(MSG_NOT_RIGHT_TYPE.format("type_", "ConfigObjectType"))
         params = {"type": type_.value}
         if settings is not None:
             params["settings"] = settings
         if application is not None:
+            if not isinstance(application, ConfigObjectApplication):
+                raise TypeError(
+                    MSG_NOT_RIGHT_TYPE.format("application", "ConfigObjectApplication")
+                )
             params["application"] = application.value
         response = super().handle_api_manager_request("Get_Config_Objects", params)
         return response
@@ -426,7 +429,7 @@ class WebADMManager(Manager):
         :rtype: dict
         """
         if product is not None and not isinstance(product, LicenseProduct):
-            raise TypeError(MSG_INVALID_PRODUCT_TYPE)
+            raise TypeError(MSG_NOT_RIGHT_TYPE.format("product", "LicenseProduct"))
         params = {}
         if product is not None:
             params["product"] = product.value
@@ -600,7 +603,7 @@ class WebADMManager(Manager):
         :rtype: bool
         """
         if status is not None and not isinstance(status, InventoryStatus):
-            raise TypeError(MSG_INVALID_STATUS_TYPE)
+            raise TypeError(MSG_NOT_RIGHT_TYPE.format("status", "InventoryStatus"))
         params = {
             "type": type_,
             "reference": reference,
@@ -722,7 +725,7 @@ class WebADMManager(Manager):
         :rtype: list
         """
         if status is not None and not isinstance(status, InventoryStatus):
-            raise TypeError(MSG_INVALID_STATUS_TYPE)
+            raise TypeError(MSG_NOT_RIGHT_TYPE.format("status", "InventoryStatus"))
         params = {"type": type_}
         if filter_ is not None:
             params["filter"] = filter_
@@ -1028,7 +1031,7 @@ class WebADMManager(Manager):
         :rtype: bool
         """
         if status is not None and not isinstance(status, InventoryStatus):
-            raise TypeError(MSG_INVALID_STATUS_TYPE)
+            raise TypeError(MSG_NOT_RIGHT_TYPE.format("status", "InventoryStatus"))
         params = {"type": type_}
         if filter_ is not None:
             params["filter"] = filter_

@@ -1,47 +1,19 @@
-import os
 import re
-import secrets
-import string
 
 import pytest
 from requests.exceptions import ConnectionError, ConnectTimeout
 from urllib3.exceptions import MaxRetryError, NewConnectionError
 
 from pyrcdevs import OpenOTPSoap
-from pyrcdevs.soap.SOAP import (InvalidAPICredentials, InvalidParams,
-                                InvalidSOAPContent)
-
-RANDOM_STRING = "".join(
-    secrets.choice(string.ascii_letters + string.digits) for _ in range(10)
+from pyrcdevs.soap.SOAP import InvalidAPICredentials, InvalidParams, InvalidSOAPContent
+from tests.constants import (
+    WEBADM_HOST,
+    RANDOM_STRING,
+    REGEX_FAILED_TO_RESOLVE,
+    REGEX_CONNECTION_REFUSED,
+    REGEX_CONNECT_TIMEOUT,
+    REGEX_MAX_RETRY,
 )
-
-REGEX_FAILED_TO_RESOLVE = (
-    r"HTTPSConnectionPool\(host='wrong_host', port=[0-9]*\): Max retries exceeded with url: /openotp/"
-    r" \(Caused by NameResolutionError\(\"<urllib3.connection.HTTPSConnection object at "
-    r"0x[0-9a-f]{12}>: Failed to resolve 'wrong_host' "
-    r"\(\[Errno -2\] Name or service not known\)\"\)\)"
-)
-
-REGEX_CONNECTION_REFUSED = (
-    r"HTTPSConnectionPool\(host='[0-9.]+', port=[0-9]+\): Max retries exceeded with url: "
-    r"/openotp/ \(Caused by NewConnectionError\('<urllib3.connection.HTTPSConnection object at "
-    r"0x[0-9a-f]{12}>: Failed to establish a new connection: \[Errno 111\] Connection "
-    r"refused'\)\)"
-)
-
-REGEX_CONNECT_TIMEOUT = (
-    r"HTTPSConnectionPool\(host='[^']*', port=[0-9]+\): Max retries exceeded with url: /openotp/ \("
-    r"Caused by (ConnectTimeoutError)\(<urllib3.connection.HTTPSConnection object at 0x[0-9a-f]{"
-    r"12}>, 'Connection to [^ ]* timed out. \(connect timeout=[0-9]+\)'\)\)"
-)
-
-REGEX_MAX_RETRY = (
-    r"HTTPSConnectionPool\(host='[^']*', port=[0-9]+\): Max retries exceeded with url: /openotp/ \("
-    r"Caused by NewConnectionError\('<urllib3.connection.HTTPSConnection object at 0x[0-9a-f]{"
-    r"12}>: Failed to establish a new connection: \[Errno 113\] No route to host'\)\)"
-)
-
-webadm_host = os.environ["WEBADM_HOST"]
 
 
 def test_wrong_host() -> None:
@@ -67,7 +39,7 @@ def test_wrong_port() -> None:
         (ConnectTimeout, NewConnectionError, MaxRetryError, OSError, ConnectionError)
     ) as excinfo:
         OpenOTPSoap(
-            webadm_host,
+            WEBADM_HOST,
             "6666",
             False,
             timeout=2,
@@ -82,7 +54,7 @@ def test_wrong_port() -> None:
 def test_p12_api_key_together() -> None:
     with pytest.raises(InvalidParams) as excinfo:
         OpenOTPSoap(
-            webadm_host,
+            WEBADM_HOST,
             "8443",
             False,
             p12_file_path="/dev/null",
@@ -98,7 +70,7 @@ def test_p12_api_key_together() -> None:
 def test_wrong_p12_file() -> None:
     with pytest.raises(ValueError) as excinfo:
         OpenOTPSoap(
-            webadm_host,
+            WEBADM_HOST,
             "8443",
             False,
             p12_file_path="/dev/null",
@@ -111,7 +83,7 @@ def test_wrong_p12_file() -> None:
 def test_wrong_p12_password() -> None:
     with pytest.raises(ValueError) as excinfo:
         OpenOTPSoap(
-            webadm_host,
+            WEBADM_HOST,
             "8443",
             False,
             p12_file_path="./clientsoap.p12",
@@ -124,7 +96,7 @@ def test_wrong_p12_password() -> None:
 def test_wrong_api_key() -> None:
     with pytest.raises(InvalidAPICredentials) as excinfo:
         OpenOTPSoap(
-            webadm_host,
+            WEBADM_HOST,
             "8443",
             False,
             api_key=RANDOM_STRING,
@@ -136,7 +108,7 @@ def test_wrong_api_key() -> None:
 def test_wrong_soap_response() -> None:
     with pytest.raises(InvalidSOAPContent) as excinfo:
         OpenOTPSoap(
-            webadm_host,
+            WEBADM_HOST,
             "443",
             False,
             api_key="5860687476061196336_d788fd99ea4868f35c3b5e21ada3920b9501bb2c",

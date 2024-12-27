@@ -1,39 +1,38 @@
 """This module implements tests for WebADM API Manager."""
 
-import os
 import re
-import secrets
-import string
+import time
 
 import pytest
 
 import pyrcdevs
 from pyrcdevs import WebADMManager
+from pyrcdevs.constants import MSG_NOT_RIGHT_TYPE
 from pyrcdevs.manager import InternalError
 from pyrcdevs.manager.Manager import InvalidParams
-from pyrcdevs.manager.WebADMManager import AutoConfirmApplication, AutoConfirmExpiration
-
-REGEX_PARAMETER_DN_NOT_STRING = (
-    "<ExceptionInfo InvalidParams('Parameter dn not String') tblen=3>"
+from pyrcdevs.manager.WebADMManager import (
+    AutoConfirmApplication,
+    AutoConfirmExpiration,
+    LicenseProduct,
+    ConfigObjectType,
+    ConfigObjectApplication,
 )
-
-REGEX_VERSION_NUMBER = r"[0-9.]+"
-RANDOM_STRING = "".join(
-    secrets.choice(string.ascii_letters + string.digits) for _ in range(10)
+from tests.constants import (
+    REGEX_PARAMETER_DN_NOT_STRING,
+    REGEX_VERSION_NUMBER,
+    RANDOM_STRING,
+    WEBADM_HOST,
+    WEBADM_API_USERNAME,
+    WEBADM_API_PASSWORD,
+    WEBADM_BASE_DN,
+    LIST_STATUS_SERVERS_KEYS,
+    LIST_STATUS_WEB_TYPES,
+    OPENOTP_TOKENKEY,
+    OPENOTP_PUSHID,
 )
-DN_PYRCDEVS_BASE_DN = "ou=pyrcdevs,o=root"
-LIST_STATUS_SERVERS_KEYS = ["ldap", "mail", "pki", "session", "sql"]
-LIST_STATUS_WEB_TYPES = {
-    "webapps": ["HelpDesk", "OpenID", "PwReset", "SelfDesk", "SelfReg"],
-    "websrvs": ["OpenOTP", "SMSHub", "SpanKey"],
-}
-
-webadm_host = os.environ["WEBADM_HOST"]
-webadm_api_username = os.environ["WEBADM_API_USERNAME"]
-webadm_api_password = os.environ["WEBADM_API_PASSWORD"]
 
 webadm_api_manager = WebADMManager(
-    webadm_host, "443", webadm_api_username, webadm_api_password, False
+    WEBADM_HOST, "443", WEBADM_API_USERNAME, WEBADM_API_PASSWORD, False
 )
 
 
@@ -75,7 +74,7 @@ def test_create_ldap_object() -> None:
 
     # Test creating testfail object with no attribute information
     create_ldap_object_response = webadm_api_manager.create_ldap_object(
-        f"cn=testfail,{DN_PYRCDEVS_BASE_DN}",
+        f"cn=testfail,{WEBADM_BASE_DN}",
         {},
     )
     assert not create_ldap_object_response
@@ -85,7 +84,7 @@ def test_create_ldap_object() -> None:
     """
     # Test creating testuser1 object
     create_ldap_object_response = webadm_api_manager.create_ldap_object(
-        f"cn=testuser1,{DN_PYRCDEVS_BASE_DN}",
+        f"cn=testuser1,{WEBADM_BASE_DN}",
         {
             "objectclass": ["person", "inetorgperson", "posixAccount"],
             "sn": "testuser1",
@@ -100,12 +99,9 @@ def test_create_ldap_object() -> None:
     )
     assert create_ldap_object_response
 
-    """
-    Test Create_LDAP_Object method
-    """
-    # Test creating testuser1 object
+    # Test creating testuser2 object
     create_ldap_object_response = webadm_api_manager.create_ldap_object(
-        f"cn=testuser2,{DN_PYRCDEVS_BASE_DN}",
+        f"cn=testuser2,{WEBADM_BASE_DN}",
         {
             "objectclass": ["person", "inetorgperson", "posixAccount"],
             "sn": "testuser2",
@@ -120,10 +116,26 @@ def test_create_ldap_object() -> None:
     )
     assert create_ldap_object_response
 
+    """
+    Test Create_LDAP_Object method
+    """
+    # Test creating testuser3 object
+    create_ldap_object_response = webadm_api_manager.create_ldap_object(
+        f"cn=testuser3,{WEBADM_BASE_DN}",
+        {
+            "objectclass": ["person", "inetorgperson"],
+            "sn": "testuser3",
+            "cn": "testuser3",
+            "uid": "testuser3",
+            "userpassword": "{SSHA}La7dfFrmC/ee3odOmFJ8bSMVy/Brmv+Y",  # NOSONAR
+        },
+    )
+    assert create_ldap_object_response
+
     # Test creating again testuser1 object
     with pytest.raises(pyrcdevs.manager.Manager.InternalError) as excinfo:
         webadm_api_manager.create_ldap_object(
-            f"cn=testuser1,{DN_PYRCDEVS_BASE_DN}",
+            f"cn=testuser1,{WEBADM_BASE_DN}",
             {
                 "objectclass": ["person", "inetorgperson"],
                 "sn": "testuser1",
@@ -134,12 +146,12 @@ def test_create_ldap_object() -> None:
         )
     assert (
         str(excinfo)
-        == f"<ExceptionInfo InternalError(\"LDAP object 'cn=testuser1,{DN_PYRCDEVS_BASE_DN}' already exist\") tblen=3>"
+        == f"<ExceptionInfo InternalError(\"LDAP object 'cn=testuser1,{WEBADM_BASE_DN}' already exist\") tblen=3>"
     )
 
     # Test creating unactivated object
     create_ldap_object_response = webadm_api_manager.create_ldap_object(
-        f"cn=unactivated,{DN_PYRCDEVS_BASE_DN}",
+        f"cn=unactivated,{WEBADM_BASE_DN}",
         {
             "objectclass": ["person", "inetorgperson"],
             "sn": "unactivated",
@@ -152,7 +164,7 @@ def test_create_ldap_object() -> None:
 
     # Test creating testgroup1 object
     create_ldap_object_response = webadm_api_manager.create_ldap_object(
-        f"cn=testgroup1,{DN_PYRCDEVS_BASE_DN}",
+        f"cn=testgroup1,{WEBADM_BASE_DN}",
         {
             "objectclass": ["groupofnames", "posixgroup"],
             "cn": "testgroup1",
@@ -163,7 +175,7 @@ def test_create_ldap_object() -> None:
 
     # Test creating testgroup2 object
     create_ldap_object_response = webadm_api_manager.create_ldap_object(
-        f"cn=testgroup2,{DN_PYRCDEVS_BASE_DN}",
+        f"cn=testgroup2,{WEBADM_BASE_DN}",
         {
             "objectclass": ["groupofnames", "posixgroup"],
             "cn": "testgroup2",
@@ -196,34 +208,73 @@ def test_activate_ldap_object() -> None:
     )
 
     # Test to activate existing account
-    activate_ldap_object_response = webadm_api_manager.activate_ldap_object(
-        f"cn=testuser1,{DN_PYRCDEVS_BASE_DN}"
-    )
-    assert activate_ldap_object_response
+    response = webadm_api_manager.activate_ldap_object(f"cn=testuser1,{WEBADM_BASE_DN}")
+    assert response
+
+    # Test to activate existing account
+    response = webadm_api_manager.activate_ldap_object(f"cn=testuser3,{WEBADM_BASE_DN}")
+    assert response
 
     # Test to activate existing account already activated
-    activate_ldap_object_response = webadm_api_manager.activate_ldap_object(
-        f"cn=testuser1,{DN_PYRCDEVS_BASE_DN}"
-    )
-    assert not activate_ldap_object_response
+    response = webadm_api_manager.activate_ldap_object(f"cn=testuser1,{WEBADM_BASE_DN}")
+    assert not response
 
     # Test to activate existing group
-    activate_ldap_object_response = webadm_api_manager.activate_ldap_object(
-        f"cn=testgroup1,{DN_PYRCDEVS_BASE_DN}"
+    response = webadm_api_manager.activate_ldap_object(
+        f"cn=testgroup1,{WEBADM_BASE_DN}"
     )
-    assert activate_ldap_object_response
+    assert response
 
     # Test to activate existing group
-    activate_ldap_object_response = webadm_api_manager.activate_ldap_object(
-        f"cn=testgroup2,{DN_PYRCDEVS_BASE_DN}"
+    response = webadm_api_manager.activate_ldap_object(
+        f"cn=testgroup2,{WEBADM_BASE_DN}"
     )
-    assert activate_ldap_object_response
+    assert response
 
     # Test to activate existing group already activated
-    activate_ldap_object_response = webadm_api_manager.activate_ldap_object(
-        f"cn=testgroup1,{DN_PYRCDEVS_BASE_DN}"
+    response = webadm_api_manager.activate_ldap_object(
+        f"cn=testgroup1,{WEBADM_BASE_DN}"
     )
-    assert not activate_ldap_object_response
+    assert not response
+
+
+def test_deactivate_ldap_object() -> None:
+    """
+    Test Deactivate_LDAP_Object method.
+    """
+    # Test to deactivate non existing object
+
+    with pytest.raises(pyrcdevs.manager.Manager.InternalError) as excinfo:
+        webadm_api_manager.deactivate_ldap_object(
+            f"cn=Not_exist_{RANDOM_STRING},o=root"
+        )
+    assert (
+        str(excinfo)
+        == f"<ExceptionInfo InternalError(\"LDAP object 'cn=Not_exist_{RANDOM_STRING},o=root' does not exist\") "
+        f"tblen=3>"
+    )
+
+    # Test to deactivate providing a malformed DN
+    with pytest.raises(pyrcdevs.manager.Manager.InternalError) as excinfo:
+        webadm_api_manager.deactivate_ldap_object(RANDOM_STRING)
+    assert (
+        str(excinfo)
+        == f"<ExceptionInfo InternalError(\"Could not read LDAP object '{RANDOM_STRING}' (invalid DN)\") tblen=3>"
+    )
+
+    # Test to deactivate an activated account
+    response = webadm_api_manager.deactivate_ldap_object(
+        f"cn=testuser3,{WEBADM_BASE_DN}"
+    )
+    assert response
+
+    with pytest.raises(pyrcdevs.manager.Manager.InternalError) as excinfo:
+        webadm_api_manager.deactivate_ldap_object(f"cn=testuser3,{WEBADM_BASE_DN}")
+    assert (
+        str(excinfo)
+        == f"<ExceptionInfo InternalError(\"Object 'cn=testuser3,{WEBADM_BASE_DN}' is not an activated user or group\")"
+        f" tblen=3>"
+    )
 
 
 def test_cert_auto_confirm() -> None:
@@ -321,13 +372,13 @@ def test_check_ldap_object() -> None:
 
     # Test with non existing DN object
     check_ldap_object_response = webadm_api_manager.check_ldap_object(
-        f"cn={RANDOM_STRING},{DN_PYRCDEVS_BASE_DN}"
+        f"cn={RANDOM_STRING},{WEBADM_BASE_DN}"
     )
     assert not check_ldap_object_response
 
     # Test with existing DN object
     check_ldap_object_response = webadm_api_manager.check_ldap_object(
-        f"cn=testuser1,{DN_PYRCDEVS_BASE_DN}"
+        f"cn=testuser1,{WEBADM_BASE_DN}"
     )
     assert check_ldap_object_response
 
@@ -353,24 +404,22 @@ def test_check_user_active() -> None:
 
     # Test with non existing DN object
     with pytest.raises(InternalError) as excinfo:
-        webadm_api_manager.check_user_active(
-            f"cn={RANDOM_STRING},{DN_PYRCDEVS_BASE_DN}"
-        )
+        webadm_api_manager.check_user_active(f"cn={RANDOM_STRING},{WEBADM_BASE_DN}")
     assert (
         str(excinfo)
-        == f"<ExceptionInfo InternalError(\"Could not read LDAP object 'cn={RANDOM_STRING},{DN_PYRCDEVS_BASE_DN}' "
+        == f"<ExceptionInfo InternalError(\"Could not read LDAP object 'cn={RANDOM_STRING},{WEBADM_BASE_DN}' "
         f'(No such object)") tblen=3>'
     )
 
     # Test with existing activated user object (testuser1)
     check_ldap_object_response = webadm_api_manager.check_user_active(
-        f"cn=testuser1,{DN_PYRCDEVS_BASE_DN}"
+        f"cn=testuser1,{WEBADM_BASE_DN}"
     )
     assert check_ldap_object_response
 
     # Test with existing unactivated user object (unactivated)
     check_ldap_object_response = webadm_api_manager.check_user_active(
-        f"cn=unactivated,{DN_PYRCDEVS_BASE_DN}"
+        f"cn=unactivated,{WEBADM_BASE_DN}"
     )
     assert not check_ldap_object_response
 
@@ -389,7 +438,7 @@ def test_check_user_password() -> None:
     # Test with wrong password type.
     with pytest.raises(InvalidParams) as excinfo:
         # noinspection PyTypeChecker
-        webadm_api_manager.check_user_password(f"cn=testuser1,{DN_PYRCDEVS_BASE_DN}", 1)
+        webadm_api_manager.check_user_password(f"cn=testuser1,{WEBADM_BASE_DN}", 1)
         # NOSONAR
     assert (
         str(excinfo)
@@ -407,25 +456,25 @@ def test_check_user_password() -> None:
     # Test with non existing DN object
     with pytest.raises(InternalError) as excinfo:
         webadm_api_manager.check_user_password(
-            f"cn={RANDOM_STRING},{DN_PYRCDEVS_BASE_DN}",
+            f"cn={RANDOM_STRING},{WEBADM_BASE_DN}",
             "password",
         )
     assert (
         str(excinfo)
-        == f"<ExceptionInfo InternalError(\"LDAP object 'cn={RANDOM_STRING},{DN_PYRCDEVS_BASE_DN}' "
+        == f"<ExceptionInfo InternalError(\"LDAP object 'cn={RANDOM_STRING},{WEBADM_BASE_DN}' "
         f'does not exist") tblen=3>'
     )
 
     # Test with existing DN object, but a wrong password
     check_user_password_response = webadm_api_manager.check_user_password(
-        f"cn=testuser1,{DN_PYRCDEVS_BASE_DN}",
+        f"cn=testuser1,{WEBADM_BASE_DN}",
         "wrong password",
     )
     assert not check_user_password_response
 
     # Test with existing DN object, and the right password
     check_user_password_response = webadm_api_manager.check_user_password(
-        f"cn=testuser1,{DN_PYRCDEVS_BASE_DN}",
+        f"cn=testuser1,{WEBADM_BASE_DN}",
         "password",
     )
     assert check_user_password_response
@@ -567,7 +616,7 @@ def test_set_user_data() -> None:
     Test Set_User_Data method.
     """
     response = webadm_api_manager.set_user_data(
-        f"cn=testuser1,{DN_PYRCDEVS_BASE_DN}",
+        f"cn=testuser1,{WEBADM_BASE_DN}",
         {
             "OpenOTP.EmergOTP": "4QrcOUm6Wau+VuBX8g+IPmZy2wOXWf+aAAA=",
             "SpanKey.PublicKey": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAq6UxOwHGPE0+O3bxOV64XNzmKPZTvW6O8zhxigi/3"
@@ -577,16 +626,83 @@ def test_set_user_data() -> None:
             "L6RvtYAHnc2xjlijV6phOxicvwMt9Q9x9CKXEDyo5B6DNwIDAQAB",
             "SpanKey.KeyType": "c3NoLXJzYQ==",
             "OpenOTP.TokenType": "VE9UUA==",
-            "OpenOTP.TokenKey": "vkg8+O132G75VYUqHprO/CT7Gdo=",
+            "OpenOTP.TokenKey": OPENOTP_TOKENKEY,
             "OpenOTP.TokenState": "MA==",
             "OpenOTP.TokenSerial": "MGEwZTI2MjgxYmRmOWYwOA==",
-            "OpenOTP.TokenModel": "c2Ftc3VuZyBTTS1HOTkxQiAoQmVub8OudCdzIFMyMSk=",
-            "OpenOTP.TokenID": "QU5EOmQ2TlRjN2NPUWUtQWdNMU9kUjM4VkE6QVBBOTFiRURpYWxBd2RsdU50aXNHN1NrcDgxR3ZhZkp2S1VlWVp"
-                               "mOTVtMG9Xd1lkODJDdE5DdkJ6M1ZCRFE0R2xKdjF2ZU0xeUxjWlFmRndNNE9sZ2JrV2JHVkg5SWNNaGpzOUhQQT"
-                               "dBeWNRVk9tMFE1dkpmZDU0RXZhck83dGFaZnotMHF4Uk5lOWc=",
+            "OpenOTP.TokenModel": "TW9iaWxlIHBob25l",
+            "OpenOTP.TokenID": OPENOTP_PUSHID,
         },
     )
     assert response
+
+
+def test_count_activated_hosts() -> None:
+    """
+    Test Count_Activated_Hosts method.
+    """
+    # Test with wrong type for product parameter
+    with pytest.raises(TypeError) as excinfo:
+        # noinspection PyTypeChecker
+        webadm_api_manager.count_activated_hosts("OpenOTP")
+    assert (
+        str(excinfo)
+        == f"<ExceptionInfo TypeError('{MSG_NOT_RIGHT_TYPE.format('product', 'LicenseProduct')}') tblen=2>"
+    )
+
+    # Test with no parameter
+    response = webadm_api_manager.count_activated_hosts()
+    assert isinstance(response, int) and response >= 0
+
+    # Test with parameter set to LicenseProduct.OPENOTP
+    response = webadm_api_manager.count_activated_hosts(LicenseProduct.OPENOTP)
+    assert isinstance(response, int) and response >= 0
+
+
+def test_count_activated_users() -> None:
+    """
+    Test Count_Activated_Users method.
+    """
+    # Test with wrong type for product parameter
+    with pytest.raises(TypeError) as excinfo:
+        # noinspection PyTypeChecker
+        webadm_api_manager.count_activated_users("OpenOTP")
+    assert (
+        str(excinfo)
+        == f"<ExceptionInfo TypeError('{MSG_NOT_RIGHT_TYPE.format('product', 'LicenseProduct')}') tblen=2>"
+    )
+
+    # Test with no parameter
+    response = webadm_api_manager.count_activated_users()
+    assert isinstance(response, int) and response >= 0
+
+    # Test with parameter set to LicenseProduct.OPENOTP
+    response = webadm_api_manager.count_activated_users(LicenseProduct.OPENOTP)
+    assert isinstance(response, int) and response >= 0
+
+
+def test_count_domain_users() -> None:
+    """
+    Test Count_Domain_Users method.
+    """
+    # Test with unknown domain
+    response = webadm_api_manager.count_domain_users(RANDOM_STRING)
+    assert not response
+
+    # Test with existing domain
+    all_users = webadm_api_manager.count_domain_users("Default")
+    assert isinstance(all_users, int) and all_users >= 0
+
+    # Test with existing domain and explicitly requesting all users
+    all_users2 = webadm_api_manager.count_domain_users("Default", False)
+    assert isinstance(all_users2, int) and all_users == all_users2
+
+    # Test with existing domain and requesting only activated users
+    activated_users = webadm_api_manager.count_domain_users("Default", True)
+    assert (
+        isinstance(activated_users, int)
+        and activated_users >= 0
+        and activated_users != all_users
+    )
 
 
 def test_set_user_attrs() -> None:
@@ -594,7 +710,7 @@ def test_set_user_attrs() -> None:
     Test Set_User_Attrs method.
     """
     response = webadm_api_manager.set_user_attrs(
-        f"cn=testuser1,{DN_PYRCDEVS_BASE_DN}",
+        f"cn=testuser1,{WEBADM_BASE_DN}",
         {
             "usercertificate": [
                 "MIIGijCCBHKgAwIBAgIRAP+NV0Vn8TNb6UAXVkMerIMwDQYJKoZIhvcNAQELBQAwHjEcMBoGA1UEAwwTV2ViQURNIENBICM4NzQxNj"
@@ -623,3 +739,52 @@ def test_set_user_attrs() -> None:
         },
     )
     assert response
+
+
+def test_get_config_objects() -> None:
+    """
+    Test Get_Config_Objects method.
+    """
+    # Test to get config using wrong type for type_ parameter
+    with pytest.raises(TypeError) as excinfo:
+        # noinspection PyTypeChecker
+        webadm_api_manager.get_config_objects("clients")
+    assert (
+        str(excinfo)
+        == f"<ExceptionInfo TypeError('{MSG_NOT_RIGHT_TYPE.format('type_', 'ConfigObjectType')}') tblen=2>"
+    )
+
+    # Test to get config using wrong type for application parameter
+    with pytest.raises(TypeError) as excinfo:
+        # noinspection PyTypeChecker
+        webadm_api_manager.get_config_objects(
+            ConfigObjectType.CLIENTS, application="openotp"
+        )
+    assert (
+        str(excinfo)
+        == f"<ExceptionInfo TypeError('{MSG_NOT_RIGHT_TYPE.format('application', 'ConfigObjectApplication')}') tblen=2>"
+    )
+
+    # Test if getting clients objects with settings parameter not provided returns a list
+    response = webadm_api_manager.get_config_objects(ConfigObjectType.CLIENTS)
+    assert isinstance(response, list)
+
+    # Test if getting clients objects with settings parameter set explicitly to qFalse returns a list
+    response = webadm_api_manager.get_config_objects(
+        ConfigObjectType.CLIENTS, settings=False
+    )
+    assert isinstance(response, list)
+
+    # Test if getting clients objects with settings parameter set True returns a dictionary
+    response = webadm_api_manager.get_config_objects(
+        ConfigObjectType.CLIENTS, settings=True
+    )
+    assert isinstance(response, dict)
+
+    # Test if getting clients objects with settings parameter set True, and application set, returns a dictionary
+    response = webadm_api_manager.get_config_objects(
+        ConfigObjectType.CLIENTS,
+        settings=True,
+        application=ConfigObjectApplication.OPENOTP,
+    )
+    assert isinstance(response, dict)

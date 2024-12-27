@@ -1,73 +1,14 @@
 import base64
+import os
 import secrets
 import string
 
-MSG_INVALID_USERNAME = "Invalid username or password"
-MSG_INVALID_REQUEST = "Invalid request"
-MSG_INVALID_AUTH_REQUEST = "Invalid authenticationrequest"
-MSG_OPERATION_SUCCESS = "Operation success"
-MSG_SERVER_ERROR = "Server error"
-MSG_SESSION_ALREADY_STARTED = "Session alreadystarted"
-MSG_MOBILE_AUTH_CANCELED = "Mobile authentication canceled"
-SETTING_SPANKEY = "SpanKey.EnableLogin=Yes"
-MSG_AUTH_SUCCESS = "Authentication success"
-RANDOM_STRING = "".join(
-    secrets.choice(string.ascii_letters + string.digits) for _ in range(10)
-)
-RANDOM_CONTEXT = "".join(
-    secrets.choice(string.ascii_letters + string.digits) for _ in range(16)
-)
-RANDOM_RETRYID = "".join(
-    secrets.choice(string.ascii_letters + string.digits) for _ in range(32)
-)
-REGEX_response = (
-    r"Server: SSH Public Key Server [0-9.]+ \(WebADM [0-9.]+\)\\r\\nSystem: Linux "
-    r"[a-z0-9.\-_]*.x86_64 x86_64 \(\d* bit\)\\r\\nListener: (([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4]"
-    r"[0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5]):[0-9]* \(HTTP\/1.1\)\\r"
-    r"\\nUptime: \d*s \(\d* days\)\\r\\nCluster Node: \d*\/\d* \(Session Server\)\\r\\nLocal "
-    r"Memory: \d*M \(\d*M total\)\\r\\nShared Memory: \d*M \(\d*M total\)\\r\\nConnectors: OK "
-    r"\(\d* alive & 0 down\)"
-)
-REGEX_SESSION_FORMAT = r"^[a-zA-Z0-9]{16,17}$"
-REGEX_TIMEOUT = r"[0-9*]"
-REGEX_ASYNC_CONFIRM = (
-    r"rcauth:\/\/confirm\/[a-z0-9]*\?version=[0-9]*&timestamp=[a-z0-9]*&reqtime=[0-9]*&session=[a-zA"
-    r"-Z0-9]{16}&challenge=[a-z0-9]{32}&signature=[a-z0-9]{32}(&file=[a-z0-9]*){0,1}&client=[a-z0-9]"
-    r"{26}&issuer=[a-z0-9]{26}(&flags=ta){0,1}&config=[a-z0-9]{8}"
-)
-REGEX_ASYNC_SIGN = (
-    r"rcauth:\/\/sign\/[a-z0-9]*\?version=[0-9]*&timestamp=[a-z0-9]*&reqtime=[0-9]*&session=[a-zA-Z0-9]"
-    r"{16}&challenge=[a-z0-9]{32}&signature=[a-z0-9]{32}(&file=[a-z0-9]*){0,1}&client=[a-z0-9]{26}&issu"
-    r"er=[a-z0-9]{26}(&flags=ta){0,1}(&scope=(global|local|eidas)){0,1}&config=[a-z0-9]{8}"
-)
-MSG_INVALID_OR_NOT_FOUND_USER = "Invalid user or user not found"
-REGEX_BASE64 = r"^(?:[A-Za-z0-9+\/]{4})*(?:[A-Za-z0-9+\/]{2}==|[A-Za-z0-9+\/]{3}=|[A-Za-z0-9+\/]{4})$"
-MSG_SESSION_NOT_STARTED = "Session not started or timedout"
-MSG_ENTER_EMERGENCY_OTP = "Enter your EMERGENCY password"
-
-with open("tests/test_file.pdf", "rb") as pdf_file:
-    PDF_FILE_BASE64 = base64.b64encode(pdf_file.read()).decode("utf-8")
+AUDITD_COMMAND = "-a always,exit -S execve"
 
 BASE64_STRING = "dGVzdAo="
-SETTINGS_LOGINMODE_LDAP = "OpenOTP.LoginMode=LDAP"
-EXCEPTION_FILE_NOT_BASE64 = (
-    "<ExceptionInfo TypeError('file parameter is not base64') tblen=2>"
-)
-EXCEPTION_QR_CODE_NOT_QRCODEFORMAT = (
-    "<ExceptionInfo TypeError('qr_format parameter is not QRCodeFormat') tblen=2>"
-)
-MSG_FILE_NOT_BASE64 = "file parameter is not base64"
-MSG_QR_NOT_QRCODEFORMAT = "qr_format parameter is not QRCodeFormat"
-MSG_NOT_RIGHT_TYPE = "{} parameter is not {}"
-EXCEPTION_NOT_RIGHT_TYPE = "<ExceptionInfo TypeError('{} parameter is not {}') tblen=2>"
-TYPE_BASE64_STRING = "base64 string"
 
-REGEX_COORDINATES = r"[0-9\.]*,[0-9\.]*"
-REGEX_IPV4 = (
-    r"^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25["
-    r"0-5])$"
-)
-REGEX_ADDRESS = r"^[0-9a-zA-Zà-üÀ-Ü, ]+$"
+EXCEPTION_NOT_RIGHT_TYPE = "<ExceptionInfo TypeError('{} parameter is not {}') tblen=2>"
+
 LIST_COUNTRY_NAMES = [
     "Aruba",
     "Afghanistan",
@@ -319,3 +260,114 @@ LIST_COUNTRY_NAMES = [
     "Zambia",
     "Zimbabwe",
 ]
+LIST_STATUS_SERVERS_KEYS = ["ldap", "mail", "pki", "session", "sql"]
+LIST_STATUS_WEB_TYPES = {
+    "webapps": ["HelpDesk", "OpenID", "PwReset", "SelfDesk", "SelfReg"],
+    "websrvs": ["OpenOTP", "SMSHub", "SpanKey"],
+}
+
+MSG_AUTH_SUCCESS = "Authentication success"
+MSG_ENTER_EMERGENCY_OTP = "Enter your EMERGENCY password"
+MSG_INVALID_AUTH_REQUEST = "Invalid authenticationrequest"
+MSG_INVALID_OR_NOT_FOUND_USER = "Invalid user or user not found"
+MSG_INVALID_REQUEST = "Invalid request"
+MSG_INVALID_SMS_REQUEST = "Invalid SMS request"
+MSG_INVALID_USERNAME = "Invalid username or password"
+MSG_MOBILE_AUTH_CANCELED = "Mobile authentication canceled"
+MSG_OPERATION_SUCCESS = "Operation success"
+MSG_SERVER_ERROR = "Server error"
+MSG_SESSION_ALREADY_STARTED = "Session alreadystarted"
+MSG_SESSION_NOT_STARTED = "Session not started or timedout"
+MSG_SMS_SENT = "SMS send success"
+MSG_WELCOME_MESSAGE = "Welcome Message Default"
+
+OPENOTP_TOKENKEY = os.environ["OPENOTP_TOKENKEY"]
+OPENOTP_PUSHID = os.environ["OPENOTP_PUSHID"]
+
+with open("tests/test_file.pdf", "rb") as pdf_file:
+    PDF_FILE_BASE64 = base64.b64encode(pdf_file.read()).decode("utf-8")
+
+RANDOM_STRING = "".join(
+    secrets.choice(string.ascii_letters + string.digits) for _ in range(10)
+)
+RANDOM_CONTEXT = "".join(
+    secrets.choice(string.ascii_letters + string.digits) for _ in range(16)
+)
+RANDOM_SESSION = "".join(
+    secrets.choice(string.ascii_letters + string.digits) for _ in range(16)
+)
+RANDOM_DATA = "".join(
+    secrets.choice(string.ascii_letters + string.digits) for _ in range(16)
+)
+RANDOM_RETRYID = "".join(
+    secrets.choice(string.ascii_letters + string.digits) for _ in range(32)
+)
+
+REGEX_ADDRESS = r"^[0-9a-zA-Zà-üÀ-Ü, -]+$"
+REGEX_ASYNC_CONFIRM = (
+    r"rcauth:\/\/confirm\/[a-z0-9]*\?version=[0-9]*&timestamp=[a-z0-9]*&reqtime=[0-9]*&session=[a-zA"
+    r"-Z0-9]{16}&challenge=[a-z0-9]{32}&signature=[a-z0-9]{32}(&file=[a-z0-9]*){0,1}&client=[a-z0-9]"
+    r"{26}&issuer=[a-z0-9]{26}(&flags=ta){0,1}&config=[a-z0-9]{8}"
+)
+REGEX_ASYNC_SIGN = (
+    r"rcauth:\/\/sign\/[a-z0-9]*\?version=[0-9]*&timestamp=[a-z0-9]*&reqtime=[0-9]*&session=[a-zA-Z0-9]"
+    r"{16}&challenge=[a-z0-9]{32}&signature=[a-z0-9]{32}(&file=[a-z0-9]*){0,1}&client=[a-z0-9]{26}&issu"
+    r"er=[a-z0-9]{26}(&flags=ta){0,1}(&scope=(global|local|eidas)){0,1}&config=[a-z0-9]{8}"
+)
+REGEX_CONNECTION_REFUSED = (
+    r"HTTPSConnectionPool\(host='[0-9.]+', port=[0-9]+\): Max retries exceeded with url: "
+    r"/[^/]*/ \(Caused by NewConnectionError\('<urllib3.connection.HTTPSConnection object at "
+    r"0x[0-9a-f]{12}>: Failed to establish a new connection: \[Errno 111\] Connection "
+    r"refused'\)\)"
+)
+REGEX_CONNECT_TIMEOUT = (
+    r"HTTPSConnectionPool\(host='[^']*', port=[0-9]+\): Max retries exceeded with url: /[^/]*/ \("
+    r"Caused by (ConnectTimeoutError)\(<urllib3.connection.HTTPSConnection object at 0x[0-9a-f]{"
+    r"12}>, 'Connection to [^ ]* timed out. \(connect timeout=[0-9]+\)'\)\)"
+)
+REGEX_COORDINATES = r"[0-9\.]*,[0-9\.]*"
+REGEX_FAILED_TO_RESOLVE = (
+    r"HTTPSConnectionPool\(host='wrong_host', port=[0-9]*\): Max retries exceeded with url: /[^/]*/"
+    r" \(Caused by NameResolutionError\(\"<urllib3.connection.HTTPSConnection object at "
+    r"0x[0-9a-f]{12}>: Failed to resolve 'wrong_host' "
+    r"\(\[Errno -2\] Name or service not known\)\"\)\)"
+)
+REGEX_IPV4 = (
+    r"^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25["
+    r"0-5])$"
+)
+REGEX_MAX_RETRY = (
+    r"HTTPSConnectionPool\(host='[^']*', port=[0-9]+\): Max retries exceeded with url: /[^/]*/ \("
+    r"Caused by NewConnectionError\('<urllib3.connection.HTTPSConnection object at 0x[0-9a-f]{"
+    r"12}>: Failed to establish a new connection: \[Errno 113\] No route to host'\)\)"
+)
+REGEX_PARAMETER_DN_NOT_STRING = (
+    "<ExceptionInfo InvalidParams('Parameter dn not String') tblen=3>"
+)
+REGEX_SESSION_FORMAT = r"^[a-zA-Z0-9]{16,17}$"
+REGEX_STATUS_RESPONSE = (
+    r"Server: [a-zA-Z ]* [0-9.]+ \(WebADM [0-9.]+\)\\r\\nSystem: Linux "
+    r"[a-z0-9.\-_]*.x86_64 x86_64 \(\d* bit\)\\r\\nListener: (([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4]"
+    r"[0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5]):[0-9]* \(HTTP\/1.1\)\\r"
+    r"\\nUptime: \d*s \(\d* days\)\\r\\nCluster Node: \d*\/\d* \(Session Server\)\\r\\nLocal "
+    r"Memory: \d*M \(\d*M total\)\\r\\nShared Memory: \d*M \(\d*M total\)\\r\\nConnectors: OK "
+    r"\(\d* alive & 0 down\)"
+)
+REGEX_TIMEOUT = r"[0-9*]"
+REGEX_VERSION_NUMBER = r"[0-9.]+"
+
+SETTINGS_LOGINMODE_LDAP = "OpenOTP.LoginMode=LDAP"
+SETTING_SPANKEY = "SpanKey.EnableLogin=Yes"
+
+SIGNATURE_DATA = ("<![CDATA[<html style='color:white'><b>Sample Confirmation</b><br><br>Account: Example<br>Amount: "
+                  "XXX.XX Euros<br></html>]]>")
+
+SMS_MOBILE = os.environ["SMS_MOBILE"]
+
+WEBADM_ADMIN_DN = os.environ["WEBADM_ADMIN_DN"]
+WEBADM_ADMIN_PASSWORD = os.environ["WEBADM_ADMIN_PASSWORD"]
+WEBADM_API_USERNAME = os.environ["WEBADM_API_USERNAME"]
+WEBADM_API_PASSWORD = os.environ["WEBADM_API_PASSWORD"]
+WEBADM_API_KEY = os.environ["WEBADM_API_KEY"]
+WEBADM_BASE_DN = os.environ["WEBADM_BASE_DN"]
+WEBADM_HOST = os.environ["WEBADM_HOST"]

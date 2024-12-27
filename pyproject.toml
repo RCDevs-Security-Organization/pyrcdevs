@@ -39,7 +39,11 @@ env = [
     "WEBADM_ADMIN_PASSWORD = password",
     "WEBADM_API_USERNAME = Default\\admin",
     "WEBADM_API_PASSWORD = password",
+    "WEBADM_BASE_DN = ou=pyrcdevs,o=root",
+    "WEBADM_API_KEY = 5860687476061196336_d788fd99ea4868f35c3b5e21ada3920b9501bb2c",
     "SMS_MOBILE = ",
+    "OPENOTP_TOKENKEY = 7aHeuw06X1wu53rZAw2RJerTKcc=",
+    "OPENOTP_PUSHID = QU5EOmQ2TlRjN2NPUWUtQWdNMU9kUjM4VkE6QVBBOTFiRURpYWxBd2RsdU50aXNHN1NrcDgxR3ZhZkp2S1VlWVpmOTVtMG9Xd1lkODJDdE5DdkJ6M1ZCRFE0R2xKdjF2ZU0xeUxjWlFmRndNNE9sZ2JrV2JHVkg5SWNNaGpzOUhQQTdBeWNRVk9tMFE1dkpmZDU0RXZhck83dGFaZnotMHF4Uk5lOWc=",
 ]
 filterwarnings = [
     "error",
@@ -51,7 +55,7 @@ filterwarnings = [
 legacy_tox_ini = """
 [tox]
 env_list =
-    py{308,309,310,311,312,313}
+    py38, py39, py310, py311, py312, py313
 
 [testenv]
 description = run the tests with pytest
@@ -59,6 +63,7 @@ commands =
     pytest {posargs:tests}
 set_env =
   VIRTUALENV_DISCOVERY = pyenv
+  PYTHONPATH = ./tests:.
 deps =
     pytest
     pytest-env

@@ -4,9 +4,7 @@ import re
 from enum import Enum
 
 from pyrcdevs.soap.SOAP import SOAP
-from tests.constants import REGEX_BASE64
-
-KEY_NS2_MAP = "ns2:Map"
+from pyrcdevs.constants import REGEX_BASE64, KEY_NS2_MAP
 
 
 def reconstruct_nss_data(response):

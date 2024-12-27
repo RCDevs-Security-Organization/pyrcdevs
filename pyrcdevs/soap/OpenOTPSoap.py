@@ -4,7 +4,7 @@ import re
 from enum import Enum
 
 from pyrcdevs.soap.SOAP import SOAP
-from tests.constants import REGEX_BASE64, MSG_NOT_RIGHT_TYPE, TYPE_BASE64_STRING
+from pyrcdevs.constants import REGEX_BASE64, MSG_NOT_RIGHT_TYPE, TYPE_BASE64_STRING
 
 
 class QRCodeFormat(Enum):

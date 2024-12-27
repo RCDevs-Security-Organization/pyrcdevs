@@ -1,6 +1,5 @@
 """This module implements tests for SpanKey SOAP API."""
 
-import os
 import re
 import time
 
@@ -8,22 +7,27 @@ import pytest
 
 from pyrcdevs import SpanKeySoap
 from pyrcdevs.soap.SpanKeySoap import NSSDatabaseType
-from tests.constants import (MSG_AUTH_SUCCESS, MSG_INVALID_OR_NOT_FOUND_USER,
-                             MSG_INVALID_REQUEST, MSG_OPERATION_SUCCESS,
-                             MSG_SERVER_ERROR, RANDOM_STRING,
-                             REGEX_SESSION_FORMAT, SETTING_SPANKEY,
-                             REGEX_response, MSG_SESSION_NOT_STARTED)
+from tests.constants import (
+    AUDITD_COMMAND,
+    MSG_AUTH_SUCCESS,
+    MSG_INVALID_OR_NOT_FOUND_USER,
+    MSG_INVALID_REQUEST,
+    MSG_OPERATION_SUCCESS,
+    MSG_SERVER_ERROR,
+    MSG_SESSION_NOT_STARTED,
+    MSG_WELCOME_MESSAGE,
+    RANDOM_STRING,
+    REGEX_SESSION_FORMAT,
+    SETTING_SPANKEY,
+    WEBADM_API_KEY,
+    WEBADM_HOST, REGEX_STATUS_RESPONSE,
+)
 
-MSG_WELCOME_MESSAGE = "Welcome Message Default"
-
-AUDITD_COMMAND = "-a always,exit -S execve"
-
-webadm_host = os.environ["WEBADM_HOST"]
 spankey_soap_api = SpanKeySoap(
-    webadm_host,
+    WEBADM_HOST,
     "8443",
     False,
-    api_key="5355123370838021707_c7d2f35a4e12cbc663bc9b0e36f9e7939b123aa7",
+    api_key=WEBADM_API_KEY,
 )
 
 
@@ -34,7 +38,7 @@ def test_status() -> None:
     response = spankey_soap_api.status()
     assert all(prefix in response for prefix in ("status", "message"))
     assert response["status"]
-    assert re.compile(REGEX_response).search(repr(response["message"]))
+    assert re.compile(REGEX_STATUS_RESPONSE).search(repr(response["message"]))
 
 
 def test_nss_list() -> None:

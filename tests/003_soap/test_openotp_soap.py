@@ -1,9 +1,6 @@
 """This module implements tests for OpenOTP SOAP API."""
 
-import os
 import re
-import secrets
-import string
 import time
 
 import pytest
@@ -11,61 +8,49 @@ import pytest
 from pyrcdevs import OpenOTPSoap
 from pyrcdevs.soap.OpenOTPSoap import QRCodeFormat, SignatureMode
 from tests.constants import (
-    MSG_INVALID_USERNAME,
-    MSG_SESSION_NOT_STARTED,
-    MSG_ENTER_EMERGENCY_OTP,
-    MSG_AUTH_SUCCESS,
     PDF_FILE_BASE64,
-    MSG_SERVER_ERROR,
-    REGEX_BASE64,
+    RANDOM_STRING,
+    RANDOM_CONTEXT,
+    RANDOM_RETRYID,
+    RANDOM_DATA,
+    REGEX_STATUS_RESPONSE,
+    REGEX_SESSION_FORMAT,
+    REGEX_TIMEOUT,
+    RANDOM_SESSION,
+    WEBADM_HOST,
+    WEBADM_API_KEY,
+    SIGNATURE_DATA,
+)
+from tests.constants import (
     BASE64_STRING,
-    SETTINGS_LOGINMODE_LDAP,
-    MSG_INVALID_AUTH_REQUEST,
-    REGEX_ASYNC_CONFIRM,
-    MSG_SESSION_ALREADY_STARTED,
-    MSG_MOBILE_AUTH_CANCELED,
-    REGEX_ASYNC_SIGN,
     EXCEPTION_NOT_RIGHT_TYPE,
+    LIST_COUNTRY_NAMES,
+    MSG_AUTH_SUCCESS,
+    MSG_ENTER_EMERGENCY_OTP,
+    MSG_INVALID_AUTH_REQUEST,
+    MSG_INVALID_USERNAME,
+    MSG_MOBILE_AUTH_CANCELED,
+    MSG_SERVER_ERROR,
+    MSG_SESSION_ALREADY_STARTED,
+    MSG_SESSION_NOT_STARTED,
+    REGEX_ADDRESS,
+    REGEX_ASYNC_CONFIRM,
+    REGEX_ASYNC_SIGN,
     REGEX_COORDINATES,
     REGEX_IPV4,
-    REGEX_ADDRESS,
-    LIST_COUNTRY_NAMES, TYPE_BASE64_STRING,
+    SETTINGS_LOGINMODE_LDAP,
+)
+from pyrcdevs.constants import (
+    REGEX_BASE64,
+    TYPE_BASE64_STRING,
 )
 
-RANDOM_STRING = "".join(
-    secrets.choice(string.ascii_letters + string.digits) for _ in range(10)
-)
-RANDOM_CONTEXT = "".join(
-    secrets.choice(string.ascii_letters + string.digits) for _ in range(16)
-)
-RANDOM_SESSION = "".join(
-    secrets.choice(string.ascii_letters + string.digits) for _ in range(16)
-)
-RANDOM_DATA = "".join(
-    secrets.choice(string.ascii_letters + string.digits) for _ in range(16)
-)
-RANDOM_RETRYID = "".join(
-    secrets.choice(string.ascii_letters + string.digits) for _ in range(32)
-)
-REGEX_STATUS_RESPONSE = (
-    r"Server: MFA Authentication Server [0-9.]+ \(WebADM [0-9.]+\)\\r\\nSystem: Linux "
-    r"[a-z0-9.\-_]*.x86_64 x86_64 \(\d* bit\)\\r\\nListener: (([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4]"
-    r"[0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5]):[0-9]* \(HTTP\/1.1\)\\r"
-    r"\\nUptime: \d*s \(\d* days\)\\r\\nCluster Node: \d*\/\d* \(Session Server\)\\r\\nLocal "
-    r"Memory: \d*M \(\d*M total\)\\r\\nShared Memory: \d*M \(\d*M total\)\\r\\nConnectors: OK "
-    r"\(\d* alive & 0 down\)"
-)
-
-REGEX_SESSION_FORMAT = r"^[a-zA-Z0-9]{16,17}$"
-REGEX_TIMEOUT = r"[0-9*]"
-
-webadm_host = os.environ["WEBADM_HOST"]
 
 openotp_soap_api = OpenOTPSoap(
-    webadm_host,
+    WEBADM_HOST,
     "8443",
     False,
-    api_key="5860687476061196336_d788fd99ea4868f35c3b5e21ada3920b9501bb2c",
+    api_key=WEBADM_API_KEY,
 )
 
 
@@ -437,7 +422,6 @@ def test_challenge() -> None:
     assert response["message"] == MSG_AUTH_SUCCESS
 
 
-@pytest.mark.skip("Require user interaction")
 def test_normal_confirm() -> None:
     """
     Test openotpNormalConfirm method.
@@ -977,7 +961,6 @@ def test_confirm_qr_code() -> None:
     assert re.compile(REGEX_BASE64).search(response["qrImage"])
 
 
-@pytest.mark.skip("Require user interaction")
 def test_normal_sign() -> None:
     """
     Test openotpNormalConfirm method.
@@ -1368,8 +1351,7 @@ def test_sign_qr_code() -> None:
     # Test for valid signature
     response = openotp_soap_api.sign_qr_code(
         "testuser1",
-        '<![CDATA[<html style="color:white"><b>Sample Confirmation</b><br><br>Account: Example<br>Amount: XXX.XX Euros'
-        "<br></html>]]>",
+        SIGNATURE_DATA,
         domain="Default",
         mode=SignatureMode.PaDES,
         timeout=60,
@@ -1428,7 +1410,51 @@ def test_seal() -> None:
     assert re.compile(REGEX_BASE64).search(response["file"])
 
 
-@pytest.mark.skip("Require user interaction")
+def test_check_badging_before_badging() -> None:
+    """
+    Test openotpCheckBadging method.
+    """
+    # Test for non existing username
+    response = openotp_soap_api.check_badging(
+        RANDOM_STRING,
+    )
+    assert all(prefix in response for prefix in ("code", "error", "message"))
+    assert response["error"] == "AuthFailed"
+    assert response["code"] == "0"
+    assert response["message"] == MSG_INVALID_USERNAME
+
+    # Test for non existing username
+    response = openotp_soap_api.check_badging(
+        "testuser1",
+        domain=RANDOM_STRING,
+    )
+    assert all(prefix in response for prefix in ("code", "error", "message"))
+    assert response["error"] == "AuthFailed"
+    assert response["code"] == "0"
+    assert response["message"] == MSG_INVALID_USERNAME
+
+    # Test for existing username
+    response = openotp_soap_api.check_badging(
+        "testuser1",
+        domain="Default",
+        client="testclient",
+        settings="",
+        source="127.0.0.1",
+        office=False,
+    )
+    assert all(
+        prefix in response
+        for prefix in (
+            "code",
+            "error",
+            "message",
+        )
+    )
+    assert response["error"] == "AuthFailed"
+    assert response["code"] == "0"
+    assert response["message"] == MSG_INVALID_USERNAME
+
+
 def test_start_badging() -> None:
     """
     Test openotpStartBadging method.
@@ -1443,8 +1469,7 @@ def test_start_badging() -> None:
     # Test for non existing username
     response = openotp_soap_api.start_badging(
         RANDOM_STRING,
-        '<![CDATA[<html style="color:white"><b>Sample Confirmation</b><br><br>Account: Example<br>Amount: XXX.XX Euros'
-        "<br></html>]]>",
+        SIGNATURE_DATA,
     )
     assert all(prefix in response for prefix in ("code", "error", "message"))
     assert response["error"] == "AuthFailed"
@@ -1495,8 +1520,7 @@ def test_start_badging() -> None:
     assert response["country"] in LIST_COUNTRY_NAMES
 
 
-@pytest.mark.skip("Require user interaction")
-def test_check_badging() -> None:
+def test_check_badging_after_badging() -> None:
     """
     Test openotpCheckBadging method.
     """
@@ -1528,7 +1552,6 @@ def test_check_badging() -> None:
         source="127.0.0.1",
         office=False,
     )
-    assert response.items() == ""
     assert all(
         prefix in response
         for prefix in (

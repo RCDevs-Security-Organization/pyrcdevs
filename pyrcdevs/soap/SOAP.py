@@ -7,9 +7,7 @@ import requests
 import requests_pkcs12
 import xmltodict
 
-MSG_SOAP_BODY = "SOAP-ENV:Body"
-
-MSG_SOAP_ENVELOP = "SOAP-ENV:Envelope"
+from pyrcdevs.constants import XML_SOAP_ENVELOP, XML_SOAP_BODY
 
 
 class InvalidAPICredentials(Exception):
@@ -150,21 +148,21 @@ class SOAP:
             raise InvalidSOAPContent(str(response.text))
 
         if (
-            MSG_SOAP_ENVELOP not in soap_reponse
-            or MSG_SOAP_BODY not in soap_reponse[MSG_SOAP_ENVELOP]
+            XML_SOAP_ENVELOP not in soap_reponse
+            or XML_SOAP_BODY not in soap_reponse[XML_SOAP_ENVELOP]
             or f"ns1:{self.service}{method_name}Response"
-            not in soap_reponse[MSG_SOAP_ENVELOP][MSG_SOAP_BODY]
+            not in soap_reponse[XML_SOAP_ENVELOP][XML_SOAP_BODY]
             or (
                 not all(
                     prefix
-                    in soap_reponse[MSG_SOAP_ENVELOP][MSG_SOAP_BODY][
+                    in soap_reponse[XML_SOAP_ENVELOP][XML_SOAP_BODY][
                         f"ns1:{self.service}{method_name}Response"
                     ]
                     for prefix in ("code", "message")
                 )
                 and not all(
                     prefix
-                    in soap_reponse[MSG_SOAP_ENVELOP][MSG_SOAP_BODY][
+                    in soap_reponse[XML_SOAP_ENVELOP][XML_SOAP_BODY][
                         f"ns1:{self.service}{method_name}Response"
                     ]
                     for prefix in ("status", "message")
@@ -173,7 +171,7 @@ class SOAP:
         ):
             raise InvalidSOAPContent(str(soap_reponse))
 
-        return soap_reponse[MSG_SOAP_ENVELOP][MSG_SOAP_BODY][
+        return soap_reponse[XML_SOAP_ENVELOP][XML_SOAP_BODY][
             f"ns1:{self.service}{method_name}Response"
         ]
 
