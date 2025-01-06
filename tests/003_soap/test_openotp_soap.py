@@ -18,8 +18,11 @@ from tests.constants import (
     REGEX_TIMEOUT,
     RANDOM_SESSION,
     WEBADM_HOST,
-    WEBADM_API_KEY,
+    OPENOTP_API_KEY,
     SIGNATURE_DATA,
+    DEFAULT_PASSWORD,
+    CLUSTER_TYPE,
+    USER_CERTIFICATES,
 )
 from tests.constants import (
     BASE64_STRING,
@@ -50,7 +53,7 @@ openotp_soap_api = OpenOTPSoap(
     WEBADM_HOST,
     "8443",
     False,
-    api_key=WEBADM_API_KEY,
+    api_key=OPENOTP_API_KEY,
 )
 
 
@@ -76,14 +79,18 @@ def test_simple_login() -> None:
     assert response["message"] == MSG_INVALID_USERNAME
 
     # Test existing username but not existing Domain
-    response = openotp_soap_api.simple_login("testuser1", domain=RANDOM_STRING)
+    response = openotp_soap_api.simple_login(
+        f"u_{CLUSTER_TYPE}_api_1", domain=RANDOM_STRING
+    )
     assert all(prefix in response for prefix in ("code", "error", "message"))
     assert response["code"] == "0"
     assert response["error"] == "AuthFailed"
     assert response["message"] == MSG_INVALID_USERNAME
 
     # Test existing username, existing Domain, but no password
-    response = openotp_soap_api.simple_login("testuser1", domain="Default")
+    response = openotp_soap_api.simple_login(
+        f"u_{CLUSTER_TYPE}_api_1", domain="Default"
+    )
     assert all(prefix in response for prefix in ("code", "error", "message"))
     assert response["code"] == "0"
     assert response["error"] == "AuthFailed"
@@ -91,7 +98,7 @@ def test_simple_login() -> None:
 
     # Test existing username, existing Domain, but wrong password
     response = openotp_soap_api.simple_login(
-        "testuser1", domain="Default", any_password=RANDOM_STRING
+        f"u_{CLUSTER_TYPE}_api_1", domain="Default", any_password=RANDOM_STRING
     )
     assert all(prefix in response for prefix in ("code", "error", "message"))
     assert response["code"] == "0"
@@ -100,7 +107,7 @@ def test_simple_login() -> None:
 
     # Test existing username, existing Domain, and right password
     response = openotp_soap_api.simple_login(
-        "testuser1", domain="Default", any_password="password"
+        f"u_{CLUSTER_TYPE}_api_1", domain="Default", any_password=DEFAULT_PASSWORD
     )
     assert all(
         prefix in response
@@ -115,9 +122,9 @@ def test_simple_login() -> None:
 
     # Test all valid settings (settings is configured so only LDAP password is checked)
     response = openotp_soap_api.simple_login(
-        "testuser1",
+        f"u_{CLUSTER_TYPE}_api_1",
         domain="Default",
-        any_password="password",
+        any_password=DEFAULT_PASSWORD,
         client="OpenOTP",
         source="127.0.0.1",
         settings=SETTINGS_LOGINMODE_LDAP,
@@ -137,7 +144,7 @@ def test_simple_login() -> None:
 
     # Test all valid settings (settings is configured so only OTP password is checked)
     response = openotp_soap_api.simple_login(
-        "testuser1",
+        f"u_{CLUSTER_TYPE}_api_1",
         domain="Default",
         any_password="123456",  # NOSONAR
         client="OpenOTP",
@@ -170,14 +177,18 @@ def test_normal_login() -> None:
     assert response["message"] == MSG_INVALID_USERNAME
 
     # Test existing username but not existing Domain
-    response = openotp_soap_api.normal_login("testuser1", domain=RANDOM_STRING)
+    response = openotp_soap_api.normal_login(
+        f"u_{CLUSTER_TYPE}_api_1", domain=RANDOM_STRING
+    )
     assert all(prefix in response for prefix in ("code", "error", "message"))
     assert response["code"] == "0"
     assert response["error"] == "AuthFailed"
     assert response["message"] == MSG_INVALID_USERNAME
 
     # Test existing username, existing Domain, but no password
-    response = openotp_soap_api.normal_login("testuser1", domain="Default")
+    response = openotp_soap_api.normal_login(
+        f"u_{CLUSTER_TYPE}_api_1", domain="Default"
+    )
     assert all(prefix in response for prefix in ("code", "error", "message"))
     assert response["code"] == "0"
     assert response["error"] == "AuthFailed"
@@ -185,7 +196,7 @@ def test_normal_login() -> None:
 
     # Test existing username, existing Domain, but wrong ldap password
     response = openotp_soap_api.normal_login(
-        "testuser1", domain="Default", ldap_password=RANDOM_STRING
+        f"u_{CLUSTER_TYPE}_api_1", domain="Default", ldap_password=RANDOM_STRING
     )
     assert all(prefix in response for prefix in ("code", "error", "message"))
     assert response["code"] == "0"
@@ -194,7 +205,7 @@ def test_normal_login() -> None:
 
     # Test existing username, existing Domain, and right ldap password
     response = openotp_soap_api.normal_login(
-        "testuser1", domain="Default", ldap_password="password"
+        f"u_{CLUSTER_TYPE}_api_1", domain="Default", ldap_password=DEFAULT_PASSWORD
     )
     assert all(
         prefix in response
@@ -209,9 +220,9 @@ def test_normal_login() -> None:
 
     # Test existing username, existing Domain, right ldap password, and wrong otp password
     response = openotp_soap_api.normal_login(
-        "testuser1",
+        f"u_{CLUSTER_TYPE}_api_1",
         domain="Default",
-        ldap_password="password",
+        ldap_password=DEFAULT_PASSWORD,
         otp_password=RANDOM_STRING,
     )
     assert all(prefix in response for prefix in ("code", "error", "message"))
@@ -221,9 +232,9 @@ def test_normal_login() -> None:
 
     # Test existing username, existing Domain, right ldap password, and right otp password
     response = openotp_soap_api.normal_login(
-        "testuser1",
+        f"u_{CLUSTER_TYPE}_api_1",
         domain="Default",
-        ldap_password="password",
+        ldap_password=DEFAULT_PASSWORD,
         otp_password="123456",  # NOSONAR
     )
     assert all(
@@ -237,9 +248,9 @@ def test_normal_login() -> None:
 
     # Test all valid settings (settings is configured so only LDAP password is checked)
     response = openotp_soap_api.normal_login(
-        "testuser1",
+        f"u_{CLUSTER_TYPE}_api_1",
         domain="Default",
-        ldap_password="password",  # NOSONAR
+        ldap_password=DEFAULT_PASSWORD,  # NOSONAR
         otp_password=RANDOM_STRING,  # NOSONAR
         client="OpenOTP",
         source="127.0.0.1",
@@ -260,7 +271,7 @@ def test_normal_login() -> None:
 
     # Test all valid settings (settings is configured so only OTP password is checked)
     response = openotp_soap_api.normal_login(
-        "testuser1",
+        f"u_{CLUSTER_TYPE}_api_1",
         domain="Default",
         ldap_password=RANDOM_STRING,  # NOSONAR
         otp_password="123456",  # NOSONAR
@@ -324,45 +335,7 @@ def test_pki_login() -> None:
     assert response["message"] == MSG_INVALID_USERNAME
 
     # Test for a valid certificate
-    response = openotp_soap_api.pki_login(
-        "-----BEGIN CERTIFICATE-----\n"
-        "MIIGijCCBHKgAwIBAgIRAP+NV0Vn8TNb6UAXVkMerIMwDQYJKoZIhvcNAQELBQAw\n"
-        "HjEcMBoGA1UEAwwTV2ViQURNIENBICM4NzQxNjExNzAeFw0yNDEyMjAxNjA5NTBa\n"
-        "Fw0yNTEyMjAxNjA5NTBaMIGWMRowGAYDVQQDDBFEZWZhdWx0XHRlc3R1c2VyMTEZ\n"
-        "MBcGCgmSJomT8ixkAQEMCXRlc3R1c2VyMTEXMBUGCgmSJomT8ixkARkWB0RlZmF1\n"
-        "bHQxFzAVBgNVBAoMDlJDRGV2cyBTdXBwb3J0MRcwFQYDVQRhDA5WQVRMVS0wMDAw\n"
-        "MDAwMDESMBAGA1UEBAwJdGVzdHVzZXIxMIICIjANBgkqhkiG9w0BAQEFAAOCAg8A\n"
-        "MIICCgKCAgEAzvZu5XWFDNiztin2srfW1gM1IlN/Y8AGXuhI9EK4glqqFFrCOr3n\n"
-        "b/Qc5RfLsuiOqG84SVOW6RoIaqO+qa17tXgPa9VQrpdsmEGGD/0275QwEiU0Ke52\n"
-        "j3nXkKSPhfcVEsXBb73SUc1O569Bajp6b9NubhrgYX7+0VegQTw6uPfeNYHI3OrR\n"
-        "SiT5rNeQwR869viSYGsUvTjIGepgIRlOxLozddIP44yPHf0nC+3sbrfmuHT1l4Qc\n"
-        "2NepzG1jnJ833Ogf/G4ZvMCYL774pRtYuLuVC2pn0aGuYmvxpJkCGSVWeZlY2Kf2\n"
-        "Q2dxU4ubZMboZKwWnbrFYgOedgxmLOmCLcj5Vjd8EdxBd08uuyqLslqO4kG0JXlZ\n"
-        "GK8s/CwUTYPlooRX4yvIFywGgxQ/RvuNS/POee5nkfTSXIlKKwIOv1Bf4fNTnqVD\n"
-        "jv4EM5jjvTtsYl48F0vBzt/XJXXzvRxdRHMjUg2+/iDEgHihuDPK5cSlPM4lTKaK\n"
-        "RQ4nxS7T+UPjEVIMFfamQ8Nq8FoZkkTA9VkbxJvyPHPaKaWK0espCChDbmCdhj77\n"
-        "eKZfZyLpr5/PZmx3AHx+hh9YnXLpsE694xvV3KqcNeGTqcmgCsxvAlyzFj1dl4W8\n"
-        "mcO9c//lDfi1dQ7pxO7/2GqQuoFEhfVLWU92vu8Ro5PGAaleFKWBxzUCAwEAAaOC\n"
-        "AUgwggFEMAsGA1UdDwQEAwIF4DApBgNVHSUEIjAgBggrBgEFBQcDAgYIKwYBBQUH\n"
-        "AwQGCisGAQQBgjcUAgIwHQYDVR0OBBYEFGPtlNCp8pTRtF/NntUOeTDwceckMIGV\n"
-        "BggrBgEFBQcBAQSBiDCBhTBHBggrBgEFBQcwAoY7aHR0cDovL2Nsb3VkLnJjZGV2\n"
-        "cy5jb20vY2EvemZkZ2psc3pwZHpsYy9jYWNlcnQvP2Zvcm1hdD1kZXIwOgYIKwYB\n"
-        "BQUHMAGGLmh0dHA6Ly9jbG91ZC5yY2RldnMuY29tL2NhL3pmZGdqbHN6cGR6bGMv\n"
-        "b2NzcC8wPgYDVR0fBDcwNTAzoDGgL4YtaHR0cDovL2Nsb3VkLnJjZGV2cy5jb20v\n"
-        "Y2EvemZkZ2psc3pwZHpsYy9jcmwvMBMGCysGAQQBgo45AwEBBARVU0VSMA0GCSqG\n"
-        "SIb3DQEBCwUAA4ICAQB6dts21Zx61Hrapfm6TgnNqleAbdPhsHn06JjDfrKMKvZG\n"
-        "plPhqWj0zj3G4yS8CcgY9ySdi3i6ZCCfdffJ6uLc+6Rw+borEvUJyn1D2SZR1g9I\n"
-        "3BT27mYdsm7+u17QTzqrabHO59Emw/BoGUPv1Ikn7T7vidTFHhbzsUf4bzu2jI3z\n"
-        "V8Q76xQwsQ+2ER87AHKtr4Y0TARmOyQGOrQu1D+32aWLU83XWZrzqbcUlVpRUYty\n"
-        "FgiUitmiIP7EKilLCkXBFLY726zU1M5ctS7PWKzuOpvRT7Jn0mM1qyqvDufLyn+3\n"
-        "33kjkx97Au33hqDF8A4k7kHyb4qzJkMRE5cCCDmubI/3o5IVdDVpuyI2bQlwYCj0\n"
-        "IJvrm5OqOLcRewXEb+lACy1K0408FmKtcGGIEbXGx1KwZp0gaCg9cd++BfL1XDSj\n"
-        "pwmBt43O9CzOv60V4ufG99s/63MMYKVLQNSS0uqUpw8nnXPKlNbBwFOKDy4wAnQs\n"
-        "kDLSD6dKvw5SEcpXk7U9fQRMTIRQ88kVRmvcqXC6lieA4nII5Mat0TaN8omOtTj1\n"
-        "Q9LwhF6WagRrijFE3ihGQDbXXAT6tKtuL/tLW2BKwa2u66WZu+zA4E9QNnhsdFyY\n"
-        "kpqE4xElu7YbCcc8ncSTX4oiRtmTvpfgvKGlVHeg5KP+3OaKuG4P7UvHIEMiEw==\n"
-        "-----END CERTIFICATE-----"
-    )
+    response = openotp_soap_api.pki_login(USER_CERTIFICATES[CLUSTER_TYPE])
     assert all(prefix in response for prefix in ("code", "error", "message"))
     assert response["code"] == "1"
     assert response["error"] is None
@@ -389,7 +362,7 @@ def test_challenge() -> None:
 
     # Start valid authentication
     response = openotp_soap_api.simple_login(
-        "testuser1", domain="Default", any_password="password"
+        f"u_{CLUSTER_TYPE}_api_1", domain="Default", any_password=DEFAULT_PASSWORD
     )
     assert all(
         prefix in response
@@ -414,7 +387,7 @@ def test_challenge() -> None:
 
     # Test with existing session and right username and OTP
     response = openotp_soap_api.challenge(
-        "testuser1", session, "123456", domain="Default"
+        f"u_{CLUSTER_TYPE}_api_1", session, "123456", domain="Default"
     )
     assert all(prefix in response for prefix in ("code", "error", "message"))
     assert response["code"] == "1"
@@ -422,6 +395,7 @@ def test_challenge() -> None:
     assert response["message"] == MSG_AUTH_SUCCESS
 
 
+@pytest.mark.skip("Requires user interaction")
 def test_normal_confirm() -> None:
     """
     Test openotpNormalConfirm method.
@@ -451,7 +425,7 @@ def test_normal_confirm() -> None:
 
     # Test for malformed source IP
     response = openotp_soap_api.normal_confirm(
-        "testuser1",
+        f"u_{CLUSTER_TYPE}_api_1",
         RANDOM_DATA,
         domain="Default",
         async_=False,
@@ -469,7 +443,7 @@ def test_normal_confirm() -> None:
 
     # Test for valid confirm
     response = openotp_soap_api.normal_confirm(
-        "testuser1",
+        f"u_{CLUSTER_TYPE}_api_1",
         RANDOM_DATA,
         domain="Default",
         async_=False,
@@ -489,7 +463,7 @@ def test_normal_confirm() -> None:
     with pytest.raises(TypeError) as excinfo:
         # noinspection PyTypeChecker
         openotp_soap_api.normal_confirm(
-            "testuser1",
+            f"u_{CLUSTER_TYPE}_api_1",
             RANDOM_DATA,
             domain="Default",
             async_=False,
@@ -505,7 +479,7 @@ def test_normal_confirm() -> None:
 
     # Test for too small file
     response = openotp_soap_api.normal_confirm(
-        "testuser1",
+        f"u_{CLUSTER_TYPE}_api_1",
         RANDOM_DATA,
         domain="Default",
         async_=False,
@@ -524,7 +498,7 @@ def test_normal_confirm() -> None:
 
     # Test for valid signature
     response = openotp_soap_api.normal_confirm(
-        "testuser1",
+        f"u_{CLUSTER_TYPE}_api_1",
         RANDOM_DATA,
         domain="Default",
         async_=False,
@@ -563,7 +537,7 @@ def test_check_confirm() -> None:
 
     # Start an asynchronous signature
     response = openotp_soap_api.normal_confirm(
-        "testuser1",
+        f"u_{CLUSTER_TYPE}_api_1",
         RANDOM_DATA,
         domain="Default",
         async_=True,
@@ -602,7 +576,7 @@ def test_check_confirm() -> None:
 
     # Start an asynchronous confirm
     response = openotp_soap_api.normal_confirm(
-        "testuser1",
+        f"u_{CLUSTER_TYPE}_api_1",
         RANDOM_DATA,
         domain="Default",
         async_=True,
@@ -659,7 +633,7 @@ def test_cancel_confirm() -> None:
 
     # Start an asynchronous signature
     response = openotp_soap_api.normal_confirm(
-        "testuser1",
+        f"u_{CLUSTER_TYPE}_api_1",
         RANDOM_DATA,
         issuer=RANDOM_STRING,
         client="testclient",
@@ -692,7 +666,7 @@ def test_cancel_confirm() -> None:
 
     # Start an asynchronous confirm
     response = openotp_soap_api.normal_confirm(
-        "testuser1",
+        f"u_{CLUSTER_TYPE}_api_1",
         RANDOM_DATA,
         domain="Default",
         async_=True,
@@ -743,7 +717,7 @@ def test_touch_confirm() -> None:
 
     # Start an asynchronous signature
     response = openotp_soap_api.normal_confirm(
-        "testuser1",
+        f"u_{CLUSTER_TYPE}_api_1",
         RANDOM_DATA,
         issuer=RANDOM_STRING,
         client="testclient",
@@ -782,7 +756,7 @@ def test_touch_confirm() -> None:
 
     # Start an asynchronous confirm
     response = openotp_soap_api.normal_confirm(
-        "testuser1",
+        f"u_{CLUSTER_TYPE}_api_1",
         RANDOM_DATA,
         issuer=RANDOM_STRING,
         client="testclient",
@@ -859,7 +833,7 @@ def test_confirm_qr_code() -> None:
 
     # Test for malformed source IP
     response = openotp_soap_api.confirm_qr_code(
-        "testuser1",
+        f"u_{CLUSTER_TYPE}_api_1",
         RANDOM_DATA,
         domain="Default",
         timeout=60,
@@ -876,7 +850,7 @@ def test_confirm_qr_code() -> None:
 
     # Test for valid confirm
     response = openotp_soap_api.confirm_qr_code(
-        "testuser1",
+        f"u_{CLUSTER_TYPE}_api_1",
         RANDOM_DATA,
         domain="Default",
         timeout=60,
@@ -903,7 +877,7 @@ def test_confirm_qr_code() -> None:
     with pytest.raises(TypeError) as excinfo:
         # noinspection PyTypeChecker
         openotp_soap_api.confirm_qr_code(
-            "testuser1",
+            f"u_{CLUSTER_TYPE}_api_1",
             RANDOM_DATA,
             domain="Default",
             timeout=60,
@@ -918,7 +892,7 @@ def test_confirm_qr_code() -> None:
 
     # Test for too small file
     response = openotp_soap_api.confirm_qr_code(
-        "testuser1",
+        f"u_{CLUSTER_TYPE}_api_1",
         RANDOM_DATA,
         domain="Default",
         timeout=60,
@@ -936,7 +910,7 @@ def test_confirm_qr_code() -> None:
 
     # Test for valid signature
     response = openotp_soap_api.confirm_qr_code(
-        "testuser1",
+        f"u_{CLUSTER_TYPE}_api_1",
         RANDOM_DATA,
         domain="Default",
         timeout=60,
@@ -961,6 +935,7 @@ def test_confirm_qr_code() -> None:
     assert re.compile(REGEX_BASE64).search(response["qrImage"])
 
 
+@pytest.mark.skip("Requires user interaction")
 def test_normal_sign() -> None:
     """
     Test openotpNormalConfirm method.
@@ -990,7 +965,7 @@ def test_normal_sign() -> None:
 
     # Test for malformed source IP
     response = openotp_soap_api.normal_sign(
-        "testuser1",
+        f"u_{CLUSTER_TYPE}_api_1",
         RANDOM_DATA,
         domain="Default",
         async_=False,
@@ -1011,7 +986,7 @@ def test_normal_sign() -> None:
     with pytest.raises(TypeError) as excinfo:
         # noinspection PyTypeChecker
         openotp_soap_api.normal_sign(
-            "testuser1",
+            f"u_{CLUSTER_TYPE}_api_1",
             RANDOM_DATA,
             domain="Default",
             async_=False,
@@ -1027,7 +1002,7 @@ def test_normal_sign() -> None:
 
     # Test for too small file
     response = openotp_soap_api.normal_sign(
-        "testuser1",
+        f"u_{CLUSTER_TYPE}_api_1",
         RANDOM_DATA,
         domain="Default",
         async_=False,
@@ -1046,7 +1021,7 @@ def test_normal_sign() -> None:
 
     # Test for signature with not right mode
     response = openotp_soap_api.normal_sign(
-        "testuser1",
+        f"u_{CLUSTER_TYPE}_api_1",
         RANDOM_DATA,
         domain="Default",
         async_=False,
@@ -1066,7 +1041,7 @@ def test_normal_sign() -> None:
 
     # Test for valid signature
     response = openotp_soap_api.normal_sign(
-        "testuser1",
+        f"u_{CLUSTER_TYPE}_api_1",
         RANDOM_DATA,
         domain="Default",
         async_=False,
@@ -1121,7 +1096,7 @@ def test_check_sign() -> None:
 
     # Start an asynchronous signature
     response = openotp_soap_api.normal_sign(
-        "testuser1",
+        f"u_{CLUSTER_TYPE}_api_1",
         RANDOM_DATA,
         domain="Default",
         async_=True,
@@ -1179,7 +1154,7 @@ def test_cancel_sign() -> None:
 
     # Start an asynchronous signature
     response = openotp_soap_api.normal_sign(
-        "testuser1",
+        f"u_{CLUSTER_TYPE}_api_1",
         RANDOM_DATA,
         issuer=RANDOM_STRING,
         client="testclient",
@@ -1231,7 +1206,7 @@ def test_touch_sign() -> None:
 
     # Start an asynchronous signature
     response = openotp_soap_api.normal_sign(
-        "testuser1",
+        f"u_{CLUSTER_TYPE}_api_1",
         RANDOM_DATA,
         issuer=RANDOM_STRING,
         client="testclient",
@@ -1298,7 +1273,7 @@ def test_sign_qr_code() -> None:
 
     # Test for malformed source IP
     response = openotp_soap_api.sign_qr_code(
-        "testuser1",
+        f"u_{CLUSTER_TYPE}_api_1",
         RANDOM_DATA,
         domain="Default",
         timeout=60,
@@ -1317,7 +1292,7 @@ def test_sign_qr_code() -> None:
     with pytest.raises(TypeError) as excinfo:
         # noinspection PyTypeChecker
         openotp_soap_api.sign_qr_code(
-            "testuser1",
+            f"u_{CLUSTER_TYPE}_api_1",
             RANDOM_DATA,
             domain="Default",
             timeout=60,
@@ -1332,7 +1307,7 @@ def test_sign_qr_code() -> None:
 
     # Test for too small file
     response = openotp_soap_api.sign_qr_code(
-        "testuser1",
+        f"u_{CLUSTER_TYPE}_api_1",
         RANDOM_DATA,
         domain="Default",
         timeout=60,
@@ -1350,7 +1325,7 @@ def test_sign_qr_code() -> None:
 
     # Test for valid signature
     response = openotp_soap_api.sign_qr_code(
-        "testuser1",
+        f"u_{CLUSTER_TYPE}_api_1",
         SIGNATURE_DATA,
         domain="Default",
         mode=SignatureMode.PaDES,
@@ -1377,6 +1352,7 @@ def test_sign_qr_code() -> None:
     assert re.compile(REGEX_BASE64).search(response["qrImage"])
 
 
+@pytest.mark.skip("Require signature credit")
 def test_seal() -> None:
     """
     Test openotpSeal method.
@@ -1425,7 +1401,7 @@ def test_check_badging_before_badging() -> None:
 
     # Test for non existing username
     response = openotp_soap_api.check_badging(
-        "testuser1",
+        f"u_{CLUSTER_TYPE}_api_1",
         domain=RANDOM_STRING,
     )
     assert all(prefix in response for prefix in ("code", "error", "message"))
@@ -1435,7 +1411,7 @@ def test_check_badging_before_badging() -> None:
 
     # Test for existing username
     response = openotp_soap_api.check_badging(
-        "testuser1",
+        f"u_{CLUSTER_TYPE}_api_1",
         domain="Default",
         client="testclient",
         settings="",
@@ -1455,6 +1431,7 @@ def test_check_badging_before_badging() -> None:
     assert response["message"] == MSG_INVALID_USERNAME
 
 
+@pytest.mark.skip("Requires user interaction")
 def test_start_badging() -> None:
     """
     Test openotpStartBadging method.
@@ -1478,7 +1455,7 @@ def test_start_badging() -> None:
 
     # Test for non existing username
     response = openotp_soap_api.start_badging(
-        "testuser1",
+        f"u_{CLUSTER_TYPE}_api_1",
         '<![CDATA[<html style="color:white"><b>Sample Confirmation</b><br><br>Account: Example<br>Amount: XXX.XX Euros'
         "<br></html>]]>",
         domain=RANDOM_STRING,
@@ -1490,7 +1467,7 @@ def test_start_badging() -> None:
 
     # Test for existing username
     response = openotp_soap_api.start_badging(
-        "testuser1",
+        f"u_{CLUSTER_TYPE}_api_1",
         '<![CDATA[<html style="color:white"><b>Sample Confirmation</b><br><br>Account: Example<br>Amount: XXX.XX Euros'
         "<br></html>]]>",
         domain="Default",
@@ -1520,6 +1497,7 @@ def test_start_badging() -> None:
     assert response["country"] in LIST_COUNTRY_NAMES
 
 
+@pytest.mark.skip("Requires user interaction")
 def test_check_badging_after_badging() -> None:
     """
     Test openotpCheckBadging method.
@@ -1535,7 +1513,7 @@ def test_check_badging_after_badging() -> None:
 
     # Test for non existing username
     response = openotp_soap_api.check_badging(
-        "testuser1",
+        f"u_{CLUSTER_TYPE}_api_1",
         domain=RANDOM_STRING,
     )
     assert all(prefix in response for prefix in ("code", "error", "message"))
@@ -1545,7 +1523,7 @@ def test_check_badging_after_badging() -> None:
 
     # Test for existing username
     response = openotp_soap_api.check_badging(
-        "testuser1",
+        f"u_{CLUSTER_TYPE}_api_1",
         domain="Default",
         client="testclient",
         settings="",

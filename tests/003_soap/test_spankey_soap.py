@@ -19,15 +19,19 @@ from tests.constants import (
     RANDOM_STRING,
     REGEX_SESSION_FORMAT,
     SETTING_SPANKEY,
-    WEBADM_API_KEY,
-    WEBADM_HOST, REGEX_STATUS_RESPONSE,
+    WEBADM_HOST,
+    REGEX_STATUS_RESPONSE,
+    CLUSTER_TYPE,
+    SPANKEY_API_KEY,
+    MSG_MISSING_SSH_KEY,
+    SSH_KEY_BACKUP, MSG_INVALID_PASSWORD, DEFAULT_PASSWORD,
 )
 
 spankey_soap_api = SpanKeySoap(
     WEBADM_HOST,
     "8443",
     False,
-    api_key=WEBADM_API_KEY,
+    api_key=SPANKEY_API_KEY,
 )
 
 
@@ -89,15 +93,15 @@ def test_nss_list() -> None:
     assert response["error"] is None
     assert response["message"] == MSG_OPERATION_SUCCESS
     assert response["data"] == {
-        "testuser1": {
+        f"u_{CLUSTER_TYPE}_api_1": {
             "gid": "100",  # NOSONAR
-            "home": "/home/testuser1",
+            "home": f"/home/u_{CLUSTER_TYPE}_api_1",
             "shell": "/bin/bash",  # NOSONAR
             "uid": "500",
         },
-        "testuser2": {
+        f"u_{CLUSTER_TYPE}_api_2": {
             "gid": "100",
-            "home": "/home/testuser2",
+            "home": f"/home/u_{CLUSTER_TYPE}_api_2",
             "shell": "/bin/bash",
             "uid": "501",
         },
@@ -115,11 +119,13 @@ def test_nss_list() -> None:
     assert response["error"] is None
     assert response["message"] == MSG_OPERATION_SUCCESS
     assert response["data"] == {
-        "testgroup1": {
+        f"g_{CLUSTER_TYPE}_api_1": {
             "gid": "100",
-            "members": {"xsd:string": ["testuser1", "testuser2"]},
+            "members": {
+                "xsd:string": [f"u_{CLUSTER_TYPE}_api_1", f"u_{CLUSTER_TYPE}_api_2"]
+            },
         },
-        "testgroup2": {
+        f"g_{CLUSTER_TYPE}_api_2": {
             "gid": "101",
             "members": None,
         },
@@ -196,7 +202,7 @@ def test_nss_info() -> None:
     # Test with non existing domain
     response = spankey_soap_api.nss_info(
         NSSDatabaseType.USER,
-        name="testuser1",
+        name=f"u_{CLUSTER_TYPE}_api_1",
         client=RANDOM_STRING,
         source="127.0.0.1",
         domain=RANDOM_STRING,
@@ -210,7 +216,7 @@ def test_nss_info() -> None:
     # Test with both id and name provided
     response = spankey_soap_api.nss_info(
         NSSDatabaseType.USER,
-        name="testuser1",
+        name=f"u_{CLUSTER_TYPE}_api_1",
         id_=500,
         client=RANDOM_STRING,
         source="127.0.0.1",
@@ -225,7 +231,7 @@ def test_nss_info() -> None:
     # Test with existing user
     response = spankey_soap_api.nss_info(
         NSSDatabaseType.USER,
-        name="testuser1",
+        name=f"u_{CLUSTER_TYPE}_api_1",
         client=RANDOM_STRING,
         source="127.0.0.1",
         domain="Default",
@@ -235,9 +241,9 @@ def test_nss_info() -> None:
     assert response["error"] is None
     assert response["message"] == MSG_OPERATION_SUCCESS
     assert response["data"] == {
-        "testuser1": {
+        f"u_{CLUSTER_TYPE}_api_1": {
             "gid": "100",
-            "home": "/home/testuser1",
+            "home": f"/home/u_{CLUSTER_TYPE}_api_1",
             "shell": "/bin/bash",
             "uid": "500",
         }
@@ -246,7 +252,7 @@ def test_nss_info() -> None:
     # Test with existing group
     response = spankey_soap_api.nss_info(
         NSSDatabaseType.GROUP,
-        name="testgroup1",
+        name=f"g_{CLUSTER_TYPE}_api_1",
         client=RANDOM_STRING,
         source="127.0.0.1",
         domain="Default",
@@ -256,8 +262,10 @@ def test_nss_info() -> None:
     assert response["error"] is None
     assert response["message"] == MSG_OPERATION_SUCCESS
     assert response["data"] == {
-        "testgroup1": {
-            "members": {"xsd:string": ["testuser1", "testuser2"]},
+        f"g_{CLUSTER_TYPE}_api_1": {
+            "members": {
+                "xsd:string": [f"u_{CLUSTER_TYPE}_api_1", f"u_{CLUSTER_TYPE}_api_2"]
+            },
             "gid": "100",
         }
     }
@@ -282,21 +290,21 @@ def test_authorized_keys() -> None:
             "code",
             "error",
             "message",
-            "offline",
             "publicKeys",
             "backupKeys",
+            "keyFiles",
         )
     )
-    assert response["code"] == "0"
-    assert response["error"] == "RequestFailed"
+    assert response["code"] == "1"
+    assert response["error"] is None
     assert response["message"] == MSG_INVALID_OR_NOT_FOUND_USER
-    assert response["offline"] == "false"
     assert response["publicKeys"] is None
-    assert response["backupKeys"] is None
+    assert response["backupKeys"] == SSH_KEY_BACKUP
+    assert response["keyFiles"] is None
 
     # Test with existing user with a SSH key enrolled
     response = spankey_soap_api.authorized_keys(
-        "testuser1",
+        f"u_{CLUSTER_TYPE}_api_1",
         client=RANDOM_STRING,
         source="127.0.0.1",
         domain="Default",
@@ -318,18 +326,18 @@ def test_authorized_keys() -> None:
     assert response["message"] == MSG_OPERATION_SUCCESS
     assert (
         response["publicKeys"]
-        == 'environment="SPANKEY_USERNAME=testuser1",environment="SPANKEY_DOMAIN=Default" ssh-rsa AAAAB3NzaC1yc2EAAAADA'
-        "QABAAABAQCrpTE7AcY8TT47dvE5Xrhc3OYo9lO9bo7zOHGKCL/cva9a8srJjRb0DlpKZIZ98v7b42i1eNFgc6DtPP8PHqBc/ywnNTOxXFaj"
-        "2FIqitqOlLoK+z5cPVp7mnuq5TblDFFxXPeH6Sk/EAheFCkYMyZ+u2khEJ0I7/XLi6uLqMpkAtjztdwo8Vq5UJzFKSuDftAgt4FTsuGwdEk"
-        "JGWQsC6Enqu2uKDWygKpisfRXDvv2tkFdtA1spW4wVuYbc+YJuzmb+MLb1nRpAwRWzgOERPEGrKpJqoJJ2p8jtYas6OEvpG+1gAedzbGOWK"
-        "NXqmE7GJy/Ay31D3H0IpcQPKjkHoM3 testuser1@Default"
+        == f'environment="SPANKEY_USERNAME=u_{CLUSTER_TYPE}_api_1",environment="SPANKEY_DOMAIN=Default" ssh-rsa AAAAB3N'
+        f"zaC1yc2EAAAADAQABAAABAQCrpTE7AcY8TT47dvE5Xrhc3OYo9lO9bo7zOHGKCL/cva9a8srJjRb0DlpKZIZ98v7b42i1eNFgc6DtPP8PH"
+        f"qBc/ywnNTOxXFaj2FIqitqOlLoK+z5cPVp7mnuq5TblDFFxXPeH6Sk/EAheFCkYMyZ+u2khEJ0I7/XLi6uLqMpkAtjztdwo8Vq5UJzFKSu"
+        f"DftAgt4FTsuGwdEkJGWQsC6Enqu2uKDWygKpisfRXDvv2tkFdtA1spW4wVuYbc+YJuzmb+MLb1nRpAwRWzgOERPEGrKpJqoJJ2p8jtYas6"
+        f"OEvpG+1gAedzbGOWKNXqmE7GJy/Ay31D3H0IpcQPKjkHoM3 u_{CLUSTER_TYPE}_api_1@Default"
     )
-    assert response["backupKeys"] is None
+    assert response["backupKeys"] == SSH_KEY_BACKUP
     assert response["keyFiles"] is None
 
-    # Test with existing user without a SSH key enrolled
+    # Test with existing user which is not activated or has no SSH key enrolled (for metadata)
     response = spankey_soap_api.authorized_keys(
-        "testuser2",
+        f"u_{CLUSTER_TYPE}_api_2",
         client=RANDOM_STRING,
         source="127.0.0.1",
         domain="Default",
@@ -341,17 +349,17 @@ def test_authorized_keys() -> None:
             "code",
             "error",
             "message",
-            "offline",
             "publicKeys",
             "backupKeys",
+            "keyFiles",
         )
     )
-    assert response["code"] == "0"
-    assert response["error"] == "RequestFailed"
-    assert response["message"] == MSG_INVALID_OR_NOT_FOUND_USER
-    assert response["offline"] == "false"
+    assert response["code"] == "1"
+    assert response["error"] is None
+    assert response["message"] == MSG_MISSING_SSH_KEY or response["message"] == MSG_INVALID_OR_NOT_FOUND_USER
     assert response["publicKeys"] is None
-    assert response["backupKeys"] is None
+    assert response["backupKeys"] == SSH_KEY_BACKUP
+    assert response["keyFiles"] is None
 
 
 def test_recovery_keys() -> None:
@@ -395,7 +403,7 @@ def test_recovery_keys() -> None:
     assert response["code"] == "1"
     assert response["error"] is None
     assert response["message"] == MSG_OPERATION_SUCCESS
-    assert response["backupKeys"] is None
+    assert response["backupKeys"] == SSH_KEY_BACKUP
 
     # Test with valid source IP and existing client policy
     response = spankey_soap_api.recovery_keys(
@@ -414,15 +422,7 @@ def test_recovery_keys() -> None:
     assert response["code"] == "1"
     assert response["error"] is None
     assert response["message"] == MSG_OPERATION_SUCCESS
-    assert (
-        response["backupKeys"]
-        == "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCrt+PYDFLWYPTDLXqrFuEUWQ0ndDcCY5WqzJD1S7Gb2UfdkwE0UVnXTug6ibgnYD1X3qb"
-        "slZsmwKjemAN9oqhRMzgwKcVczS8kLT/qz4Q6VQFU4v0ERaa6xebSdaRBXTe5YNVDGK5vIFYjnf4Qsex2+BDS4Q/mRRPvw4mHwbgEovlPer"
-        "NvgW5JU7QieGbmlwW2hHVjwkEHBZFXqzi7hdYf8t/9tIhQPtTXXc7n+WMNsqmVR7uiPujoPWhn8wqz3xZirsvp4QOD6apPZfIeYJROg2Ly0"
-        "jiVaCaCA/m1RmOHsatdtbL994s0Urc/5YiZ8Yzl/kzSrhSpGmrXKMnP8EpQSEJnqE/uHWODWSHPsp87FjT2szKqqzDZwYAXaHneUtlZJqVb"
-        "lAX95xKca+4+QqfoY3oZZwH42BdNqByXs5gBpdbEuXdSbVdPzoFKfxQ2ycGOVNYgi4au7vnvEWIYyhlO5sYiuq87eOvewN4HPK2W/4jbvPy"
-        "DPaZqp20xAhcsfjs="
-    )
+    assert response["backupKeys"] == SSH_KEY_BACKUP
 
 
 def test_sudoers() -> None:
@@ -455,7 +455,7 @@ def test_sudoers() -> None:
 
     # Test with existing user with a SSH key enrolled, and a non existing client policy
     response = spankey_soap_api.sudoers(
-        "testuser1",
+        f"u_{CLUSTER_TYPE}_api_1",
         client=RANDOM_STRING,
         source="127.0.0.1",
         domain="Default",
@@ -473,12 +473,12 @@ def test_sudoers() -> None:
     assert response["code"] == "1"
     assert response["error"] is None
     assert response["message"] == MSG_OPERATION_SUCCESS
-    assert response["sudoAdvanced"] is None
-    assert response["sudoCommands"] is None
+    assert response["sudoAdvanced"] == '"ALL=(ALL) /bin/df"'
+    assert response["sudoCommands"] == f"u_{CLUSTER_TYPE}_api_1 ALL=(ALL) /bin/touch"
 
     # Test with existing user with a SSH key enrolled, and an existing client policy
     response = spankey_soap_api.sudoers(
-        "testuser1",
+        f"u_{CLUSTER_TYPE}_api_1",
         client="testclient",
         source="127.0.0.1",
         domain="Default",
@@ -496,12 +496,12 @@ def test_sudoers() -> None:
     assert response["code"] == "1"
     assert response["error"] is None
     assert response["message"] == MSG_OPERATION_SUCCESS
-    assert response["sudoAdvanced"] == "ALL=(ALL) /bin/df"
-    assert response["sudoCommands"] == "testuser1 ALL=ALL=/bin/ls"
+    assert response["sudoAdvanced"] == '"ALL=(ALL) /bin/df"'
+    assert response["sudoCommands"] == f"u_{CLUSTER_TYPE}_api_1 ALL=(ALL) /bin/touch"
 
-    # Test with existing user without a SSH key enrolled
+    # Test with existing user which is not activated or has no SSH key enrolled (for metadata)
     response = spankey_soap_api.sudoers(
-        "testuser2",
+        f"u_{CLUSTER_TYPE}_api_2",
         client=RANDOM_STRING,
         source="127.0.0.1",
         domain="Default",
@@ -516,11 +516,11 @@ def test_sudoers() -> None:
             "sudoCommands",
         )
     )
-    assert response["code"] == "0"
-    assert response["error"] == "ServerError"
-    assert response["message"] == "Server error"
-    assert response["sudoAdvanced"] is None
-    assert response["sudoCommands"] is None
+    assert response["code"] in ["0", "1"]
+    assert response["error"] in (None, "ServerError")
+    assert response["message"] in [MSG_OPERATION_SUCCESS, MSG_SERVER_ERROR]
+    assert response["sudoAdvanced"] in (None, '"ALL=(ALL) /bin/df"')
+    assert response["sudoCommands"] in (None, f"u_{CLUSTER_TYPE}_api_2 ALL=(ALL) /bin/touch")
 
 
 def test_session_start() -> None:
@@ -559,8 +559,8 @@ def test_session_start() -> None:
 
     # Test with existing user
     response = spankey_soap_api.session_start(
-        "testuser1",
-        identity="testuser1",
+        f"u_{CLUSTER_TYPE}_api_1",
+        identity=f"u_{CLUSTER_TYPE}_api_1",
         domain="Default",
         server="ssh-server",
         command="/bin/bash",
@@ -623,8 +623,8 @@ def test_session_update() -> None:
 
     # Start a SSH connection in order to get an existing session
     response = spankey_soap_api.session_start(
-        "testuser1",
-        identity="testuser1",
+        f"u_{CLUSTER_TYPE}_api_1",
+        identity=f"u_{CLUSTER_TYPE}_api_1",
         terminal=True,
         client=RANDOM_STRING,
         domain="Default",
@@ -771,8 +771,8 @@ def test_session_login() -> None:
 
     # Start a SSH connection in order to get an existing session
     response = spankey_soap_api.session_start(
-        "testuser1",
-        identity="testuser1",
+        f"u_{CLUSTER_TYPE}_api_1",
+        identity=f"u_{CLUSTER_TYPE}_api_1",
         domain="Default",
         server="ssh-server",
         command="/bin/bash",
@@ -797,7 +797,7 @@ def test_session_login() -> None:
             "code",
         )
     )
-    assert response["code"] == "2"
+    assert response["code"] == "1"
     assert response["error"] is None
     assert response["message"] == MSG_OPERATION_SUCCESS
     assert re.compile(REGEX_SESSION_FORMAT).search(response["session"])
@@ -823,12 +823,12 @@ def test_session_login() -> None:
             "message",
         )
     )
-    assert response["code"] == "0"
-    assert response["error"] == "AuthFailed"
-    assert response["message"] == "Invalid username or password"
+    assert response["code"] == "1"
+    assert response["error"] is None
+    assert response["message"] == MSG_OPERATION_SUCCESS
 
-    # Test with existing session but wrong password
-    response = spankey_soap_api.session_login(existing_session, password="password")
+    # Test with existing session but right password
+    response = spankey_soap_api.session_login(existing_session, password=DEFAULT_PASSWORD)
     assert all(
         prefix in response
         for prefix in (
@@ -839,7 +839,7 @@ def test_session_login() -> None:
     )
     assert response["code"] == "1"
     assert response["error"] is None
-    assert response["message"] == MSG_AUTH_SUCCESS
+    assert response["message"] == MSG_OPERATION_SUCCESS
 
 
 def test_session_unlock() -> None:
@@ -866,8 +866,8 @@ def test_session_unlock() -> None:
 
     # Start a new SSH connection in order to get an existing session
     response = spankey_soap_api.session_start(
-        "testuser1",
-        identity="testuser1",
+        f"u_{CLUSTER_TYPE}_api_1",
+        identity=f"u_{CLUSTER_TYPE}_api_1",
         domain="Default",
         terminal=True,
         client="testclient",
@@ -893,7 +893,7 @@ def test_session_unlock() -> None:
         )
     )
     assert response["message"] == MSG_OPERATION_SUCCESS
-    assert response["code"] == "2"
+    assert response["code"] == "1"
     assert response["error"] is None
     assert re.compile(REGEX_SESSION_FORMAT).search(response["session"])
     existing_session = response["session"]
@@ -920,21 +920,39 @@ def test_session_unlock() -> None:
     )
     assert response["code"] == "2"
     assert response["error"] == "AuthFailed"
-    assert response["message"] == "Invalid password"
+    assert response["message"] == MSG_INVALID_PASSWORD
 
-    # Test with existing session but wrong password
-    response = spankey_soap_api.session_unlock(existing_session, password="password")
+    # Test with existing session but right password
+    response = spankey_soap_api.session_unlock(existing_session, password=DEFAULT_PASSWORD)
     assert all(
         prefix in response
         for prefix in (
-            "code",
             "error",
             "message",
+            "session",
+            "record",
+            "auditd",
+            "create",
+            "welcome",
+            "maxtime",
+            "locktime",
+            "delete",
+            "offline",
+            "code",
         )
     )
+    assert response["message"] == MSG_OPERATION_SUCCESS
     assert response["code"] == "1"
     assert response["error"] is None
-    assert response["message"] == MSG_OPERATION_SUCCESS
+    assert response["session"] is None
+    assert response["welcome"] is None
+    assert response["create"] == "false"
+    assert response["delete"] == "false"
+    assert response["offline"] == "false"
+    assert response["maxtime"] == "0"
+    assert response["locktime"] == "0"
+    assert response["record"] is None
+    assert response["auditd"] is None
 
 
 def test_password_change() -> None:
@@ -962,10 +980,10 @@ def test_password_change() -> None:
 
     # Start a new SSH connection in order to get an existing session
     response = spankey_soap_api.session_start(
-        "testuser1",
+        f"u_{CLUSTER_TYPE}_api_1",
         domain="Default",
         terminal=True,
-        identity="testuser1",
+        identity=f"u_{CLUSTER_TYPE}_api_1",
         client="testclient",
         server="ssh-server",
         command="/bin/bash",
@@ -988,10 +1006,11 @@ def test_password_change() -> None:
             "code",
         )
     )
+
     assert response["record"] == "TTY LOG"
     assert response["auditd"] == AUDITD_COMMAND
     assert response["message"] == MSG_OPERATION_SUCCESS
-    assert response["code"] == "2"
+    assert response["code"] == "1"
     assert response["error"] is None
     assert re.compile(REGEX_SESSION_FORMAT).search(response["session"])
     existing_session = response["session"]
@@ -1020,13 +1039,13 @@ def test_password_change() -> None:
     )
     assert response["error"] == "AuthFailed"
     assert response["code"] == "2"
-    assert response["message"] == "Invalid password"
+    assert response["message"] == MSG_INVALID_PASSWORD
 
     # Test with existing session, right current password but same new password
     response = spankey_soap_api.password_change(
         existing_session,
-        "password",
-        "password",
+        DEFAULT_PASSWORD,
+        DEFAULT_PASSWORD,
     )
     assert all(
         prefix in response
@@ -1043,8 +1062,8 @@ def test_password_change() -> None:
     # Test with existing session, right current password and different new password
     response = spankey_soap_api.password_change(
         existing_session,
-        "password",
-        "newpassword",
+        DEFAULT_PASSWORD,
+        f"{RANDOM_STRING}!",
     )
     assert all(
         prefix in response

@@ -1,7 +1,7 @@
 import ldap
 from ldap.ldapobject import SimpleLDAPObject
 
-from tests.constants import WEBADM_HOST, WEBADM_ADMIN_DN, WEBADM_ADMIN_PASSWORD, WEBADM_BASE_DN
+from tests.constants import LDAP_HOST, LDAP_BASE_DN, LDAP_USERNAME, LDAP_PASSWORD
 
 
 def ldap_recursive_delete(conn, base_dn, excluded_dns):
@@ -31,14 +31,14 @@ def test_init() -> None:
             ["OU for pyrcdevs testing".encode("utf-8")],
         ),
     ]
-    ldap_connection = ldap.initialize(f"ldap://{WEBADM_HOST}:389")
+    ldap_connection = ldap.initialize(f"ldap://{LDAP_HOST}:389")
     assert isinstance(ldap_connection, SimpleLDAPObject)
     ldap_connection.protocol_version = ldap.VERSION3
-    ldap_connection.simple_bind_s(WEBADM_ADMIN_DN, WEBADM_ADMIN_PASSWORD)
+    ldap_connection.simple_bind_s(LDAP_USERNAME, LDAP_PASSWORD)
     try:
-        ldap_connection.search_s(WEBADM_BASE_DN, ldap.SCOPE_ONELEVEL)
-        ldap_recursive_delete(ldap_connection, WEBADM_BASE_DN, [WEBADM_BASE_DN])
+        ldap_connection.search_s(LDAP_BASE_DN, ldap.SCOPE_ONELEVEL)
+        ldap_recursive_delete(ldap_connection, LDAP_BASE_DN, [LDAP_BASE_DN])
     except ldap.NO_SUCH_OBJECT:
-        ldap_connection.add_s(WEBADM_BASE_DN, attrs)
-    assert ldap_connection.search_s(WEBADM_BASE_DN, ldap.SCOPE_ONELEVEL) == []
+        ldap_connection.add_s(LDAP_BASE_DN, attrs)
+    assert ldap_connection.search_s(LDAP_BASE_DN, ldap.SCOPE_ONELEVEL) == []
     ldap_connection.unbind_s()

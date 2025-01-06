@@ -29,11 +29,69 @@ from tests.constants import (
     LIST_STATUS_WEB_TYPES,
     OPENOTP_TOKENKEY,
     OPENOTP_PUSHID,
+    GROUP_OBJECTCLASS,
+    DEFAULT_PASSWORD,
+    LDAP_BASE_DN,
+    CLUSTER_TYPE,
+    USER_CERTIFICATES,
 )
 
 webadm_api_manager = WebADMManager(
     WEBADM_HOST, "443", WEBADM_API_USERNAME, WEBADM_API_PASSWORD, False
 )
+
+
+def generate_user_attrs(
+    username: str, uid_number: int = None, gid_number: int = None
+) -> dict:
+    """
+    This method creates and returns a dictionary of user attributes
+    :param str username: username of account
+    :param int uid_number: UID number of account for posixaccount objectclass
+    :param int gid_number: GID number of account for posixaccount objectclass
+    :return: a dictionary of user attributes
+    :rtype: dict
+    """
+    user_attributes = {
+        "objectclass": ["person", "inetorgperson"],
+        "sn": username,
+        "cn": username,
+        "uid": username,
+    }
+    if None not in (uid_number, gid_number):
+        user_attributes["objectclass"].append("posixAccount")
+        user_attributes["uidnumber"] = uid_number
+        user_attributes["gidnumber"] = gid_number
+        user_attributes["homedirectory"] = f"/home/{username}"
+        user_attributes["loginshell"] = "/bin/bash"
+
+    if GROUP_OBJECTCLASS == "group":
+        user_attributes["useraccountcontrol"] = "512"
+        user_attributes["unicodePwd"] = DEFAULT_PASSWORD
+        user_attributes["samaccountname"] = username
+    else:
+        user_attributes["userpassword"] = (
+            "{SSHA}La7dfFrmC/ee3odOmFJ8bSMVy/Brmv+Y"  # NOSONAR
+        )
+    return user_attributes
+
+
+def generate_group_attrs(groupname: str, gid_number: int) -> dict:
+    """
+    This method creates and returns a dictionary of group attributes
+    :param str groupname: name of group
+    :param int gid_number: GID number of group for posixgroup objectclass
+    :return: a dictionary of group attributes
+    :rtype: dict
+    """
+    group_attributes = {
+        "objectclass": [GROUP_OBJECTCLASS, "posixgroup"],
+        "cn": groupname,
+        "gidnumber": gid_number,
+    }
+    if GROUP_OBJECTCLASS == "group":
+        group_attributes["samaccountname"] = groupname
+    return group_attributes
 
 
 def test_create_ldap_object() -> None:
@@ -52,12 +110,16 @@ def test_create_ldap_object() -> None:
     assert (
         str(excinfo)
         == f"<ExceptionInfo InternalError(\"Could not read LDAP object '{RANDOM_STRING}' (invalid DN)\") tblen=3>"
+        or str(excinfo)
+        == f"<ExceptionInfo InternalError(\"Could not read LDAP object '{RANDOM_STRING}' "
+        f"(0000208F: NameErr: DSID-03100233, problem 2006 (BAD_NAME), data 8350, best match "
+        f"of:\\t'{RANDOM_STRING}')\") tblen=3>"
     )
 
     # Test creating object in non existing container
     with pytest.raises(pyrcdevs.manager.Manager.InternalError) as excinfo:
         webadm_api_manager.create_ldap_object(
-            f"cn=testfail,ou={RANDOM_STRING},o=root",
+            f"cn=testfail,ou={RANDOM_STRING},{WEBADM_BASE_DN}",
             {
                 "objectclass": ["person", "inetorgperson"],
                 "sn": "testfail",
@@ -66,123 +128,93 @@ def test_create_ldap_object() -> None:
                 "userpassword": "{SSHA}La7dfFrmC/ee3odOmFJ8bSMVy/Brmv+Y",  # NOSONAR
             },
         )
+
     assert (
         str(excinfo)
-        == f"<ExceptionInfo InternalError(\"Could not create LDAP object 'cn=testfail,ou={RANDOM_STRING},o=root' "
+        == f"<ExceptionInfo InternalError(\"Could not create LDAP object 'cn=testfail,ou={RANDOM_STRING},{WEBADM_BASE_DN}' "
         f'(No such object)") tblen=3>'
+        or str(excinfo)
+        == f"<ExceptionInfo InternalError(\"Could not create LDAP object 'cn=testfail,ou={RANDOM_STRING},"
+        f"{WEBADM_BASE_DN[:47]}..., data 0, best match of:\\t'{LDAP_BASE_DN}')\") tblen=3>"
+        or str(excinfo.value)
+        == f"Could not create LDAP object 'cn=testfail,ou={RANDOM_STRING},{WEBADM_BASE_DN}' "
+        f"(0000208D: NameErr: DSID-0310028D, problem 2001 (NO_OBJECT), data 0, best match "
+        f"of:\t'{LDAP_BASE_DN}')"
     )
 
     # Test creating testfail object with no attribute information
-    create_ldap_object_response = webadm_api_manager.create_ldap_object(
+    response = webadm_api_manager.create_ldap_object(
         f"cn=testfail,{WEBADM_BASE_DN}",
         {},
     )
-    assert not create_ldap_object_response
+    assert not response
 
     """
     Test Create_LDAP_Object method
     """
-    # Test creating testuser1 object
-    create_ldap_object_response = webadm_api_manager.create_ldap_object(
-        f"cn=testuser1,{WEBADM_BASE_DN}",
-        {
-            "objectclass": ["person", "inetorgperson", "posixAccount"],
-            "sn": "testuser1",
-            "cn": "testuser1",
-            "uid": "testuser1",
-            "uidnumber": 500,
-            "gidnumber": 100,
-            "homedirectory": "/home/testuser1",
-            "loginshell": "/bin/bash",
-            "userpassword": "{SSHA}La7dfFrmC/ee3odOmFJ8bSMVy/Brmv+Y",  # NOSONAR
-        },
+    # Test creating testuserapi1 object
+    user_attributes = generate_user_attrs(f"u_{CLUSTER_TYPE}_api_1", 500, 100)
+    response = webadm_api_manager.create_ldap_object(
+        f"cn=u_{CLUSTER_TYPE}_api_1,{WEBADM_BASE_DN}",
+        user_attributes,
     )
-    assert create_ldap_object_response
+    assert response
 
-    # Test creating testuser2 object
-    create_ldap_object_response = webadm_api_manager.create_ldap_object(
-        f"cn=testuser2,{WEBADM_BASE_DN}",
-        {
-            "objectclass": ["person", "inetorgperson", "posixAccount"],
-            "sn": "testuser2",
-            "cn": "testuser2",
-            "uid": "testuser2",
-            "uidnumber": 501,
-            "gidnumber": 100,
-            "homedirectory": "/home/testuser2",
-            "loginshell": "/bin/bash",
-            "userpassword": "{SSHA}La7dfFrmC/ee3odOmFJ8bSMVy/Brmv+Y",  # NOSONAR
-        },
+    # Test creating testuserapi2 object
+    user_attributes = generate_user_attrs(f"u_{CLUSTER_TYPE}_api_2", 501, 100)
+    response = webadm_api_manager.create_ldap_object(
+        f"cn=u_{CLUSTER_TYPE}_api_2,{WEBADM_BASE_DN}",
+        user_attributes,
     )
-    assert create_ldap_object_response
+    assert response
 
     """
     Test Create_LDAP_Object method
     """
-    # Test creating testuser3 object
-    create_ldap_object_response = webadm_api_manager.create_ldap_object(
-        f"cn=testuser3,{WEBADM_BASE_DN}",
-        {
-            "objectclass": ["person", "inetorgperson"],
-            "sn": "testuser3",
-            "cn": "testuser3",
-            "uid": "testuser3",
-            "userpassword": "{SSHA}La7dfFrmC/ee3odOmFJ8bSMVy/Brmv+Y",  # NOSONAR
-        },
+    # Test creating testuserapi3 object
+    user_attributes = generate_user_attrs(f"u_{CLUSTER_TYPE}_api_3")
+    response = webadm_api_manager.create_ldap_object(
+        f"cn=u_{CLUSTER_TYPE}_api_3,{WEBADM_BASE_DN}",
+        user_attributes,
     )
-    assert create_ldap_object_response
+    assert response
 
-    # Test creating again testuser1 object
+    # Test creating again testuserapi1 object
     with pytest.raises(pyrcdevs.manager.Manager.InternalError) as excinfo:
+        user_attributes = generate_user_attrs(f"u_{CLUSTER_TYPE}_api_1", 500, 100)
         webadm_api_manager.create_ldap_object(
-            f"cn=testuser1,{WEBADM_BASE_DN}",
-            {
-                "objectclass": ["person", "inetorgperson"],
-                "sn": "testuser1",
-                "cn": "testuser1",
-                "uid": "testuser1",
-                "userpassword": "{SSHA}La7dfFrmC/ee3odOmFJ8bSMVy/Brmv+Y",  # NOSONAR
-            },
+            f"cn=u_{CLUSTER_TYPE}_api_1,{WEBADM_BASE_DN}",
+            user_attributes,
         )
     assert (
         str(excinfo)
-        == f"<ExceptionInfo InternalError(\"LDAP object 'cn=testuser1,{WEBADM_BASE_DN}' already exist\") tblen=3>"
+        == f"<ExceptionInfo InternalError(\"LDAP object 'cn=u_{CLUSTER_TYPE}_api_1,{WEBADM_BASE_DN}' already exist\") "
+        f"tblen=3>"
     )
 
     # Test creating unactivated object
-    create_ldap_object_response = webadm_api_manager.create_ldap_object(
-        f"cn=unactivated,{WEBADM_BASE_DN}",
-        {
-            "objectclass": ["person", "inetorgperson"],
-            "sn": "unactivated",
-            "cn": "unactivated",
-            "uid": "unactivated",
-            "userpassword": "{SSHA}La7dfFrmC/ee3odOmFJ8bSMVy/Brmv+Y",  # NOSONAR
-        },
+    user_attributes = generate_user_attrs(f"u_{CLUSTER_TYPE}_unact")
+    response = webadm_api_manager.create_ldap_object(
+        f"cn=u_{CLUSTER_TYPE}_unact,{WEBADM_BASE_DN}",
+        user_attributes,
     )
-    assert create_ldap_object_response
+    assert response
 
     # Test creating testgroup1 object
-    create_ldap_object_response = webadm_api_manager.create_ldap_object(
-        f"cn=testgroup1,{WEBADM_BASE_DN}",
-        {
-            "objectclass": ["groupofnames", "posixgroup"],
-            "cn": "testgroup1",
-            "gidnumber": 100,
-        },
+    group_attributes = generate_group_attrs(f"g_{CLUSTER_TYPE}_api_1", 100)
+    response = webadm_api_manager.create_ldap_object(
+        f"cn=g_{CLUSTER_TYPE}_api_1,{WEBADM_BASE_DN}",
+        group_attributes,
     )
-    assert create_ldap_object_response
+    assert response
 
     # Test creating testgroup2 object
-    create_ldap_object_response = webadm_api_manager.create_ldap_object(
-        f"cn=testgroup2,{WEBADM_BASE_DN}",
-        {
-            "objectclass": ["groupofnames", "posixgroup"],
-            "cn": "testgroup2",
-            "gidnumber": 101,
-        },
+    group_attributes = generate_group_attrs(f"g_{CLUSTER_TYPE}_api_2", 101)
+    response = webadm_api_manager.create_ldap_object(
+        f"cn=g_{CLUSTER_TYPE}_api_2,{WEBADM_BASE_DN}",
+        group_attributes,
     )
-    assert create_ldap_object_response
+    assert response
 
 
 def test_activate_ldap_object() -> None:
@@ -192,11 +224,16 @@ def test_activate_ldap_object() -> None:
     # Test to activate non existing object
 
     with pytest.raises(pyrcdevs.manager.Manager.InternalError) as excinfo:
-        webadm_api_manager.activate_ldap_object(f"cn=Not_exist_{RANDOM_STRING},o=root")
+        webadm_api_manager.activate_ldap_object(
+            f"cn=Not_exist_{RANDOM_STRING},{WEBADM_BASE_DN}"
+        )
     assert (
         str(excinfo)
         == f"<ExceptionInfo InternalError(\"LDAP object 'cn=Not_exist_{RANDOM_STRING},o=root' does not exist\") "
         f"tblen=3>"
+        or str(excinfo)
+        == f"<ExceptionInfo InternalError(\"LDAP object 'cn=Not_exist_{RANDOM_STRING},{WEBADM_BASE_DN}' "
+        'does not exist") tblen=3>'
     )
 
     # Test to activate providing a malformed DN
@@ -205,35 +242,57 @@ def test_activate_ldap_object() -> None:
     assert (
         str(excinfo)
         == f"<ExceptionInfo InternalError(\"Could not read LDAP object '{RANDOM_STRING}' (invalid DN)\") tblen=3>"
+        or str(excinfo)
+        == f"<ExceptionInfo InternalError(\"Could not read LDAP object '{RANDOM_STRING}' (0000208F: "
+        f"NameErr: DSID-03100233, problem 2006 (BAD_NAME), data 8350, best match of:"
+        f"\\t'{RANDOM_STRING}')\") tblen=3>"
     )
 
     # Test to activate existing account
-    response = webadm_api_manager.activate_ldap_object(f"cn=testuser1,{WEBADM_BASE_DN}")
-    assert response
+    response = webadm_api_manager.activate_ldap_object(
+        f"cn=u_{CLUSTER_TYPE}_api_1,{WEBADM_BASE_DN}"
+    )
+    if "metadata" in WEBADM_HOST:
+        assert not response
+    else:
+        assert response
 
     # Test to activate existing account
-    response = webadm_api_manager.activate_ldap_object(f"cn=testuser3,{WEBADM_BASE_DN}")
-    assert response
+    response = webadm_api_manager.activate_ldap_object(
+        f"cn=u_{CLUSTER_TYPE}_api_3,{WEBADM_BASE_DN}"
+    )
+    if "metadata" in WEBADM_HOST:
+        assert not response
+    else:
+        assert response
 
     # Test to activate existing account already activated
-    response = webadm_api_manager.activate_ldap_object(f"cn=testuser1,{WEBADM_BASE_DN}")
+    response = webadm_api_manager.activate_ldap_object(
+        f"cn=u_{CLUSTER_TYPE}_api_1,{WEBADM_BASE_DN}"
+    )
     assert not response
 
     # Test to activate existing group
     response = webadm_api_manager.activate_ldap_object(
-        f"cn=testgroup1,{WEBADM_BASE_DN}"
+        f"cn=g_{CLUSTER_TYPE}_api_1,{WEBADM_BASE_DN}"
     )
-    assert response
+    if "metadata" in WEBADM_HOST:
+        assert not response
+    else:
+        assert response
 
     # Test to activate existing group
     response = webadm_api_manager.activate_ldap_object(
-        f"cn=testgroup2,{WEBADM_BASE_DN}"
+        f"cn=g_{CLUSTER_TYPE}_api_2,{WEBADM_BASE_DN}"
     )
-    assert response
+    if "metadata" in WEBADM_HOST:
+        assert not response
+    else:
+        assert response
 
     # Test to activate existing group already activated
     response = webadm_api_manager.activate_ldap_object(
-        f"cn=testgroup1,{WEBADM_BASE_DN}"
+        f"cn=g_{CLUSTER_TYPE}_api_1,{WEBADM_BASE_DN}"
     )
     assert not response
 
@@ -246,12 +305,15 @@ def test_deactivate_ldap_object() -> None:
 
     with pytest.raises(pyrcdevs.manager.Manager.InternalError) as excinfo:
         webadm_api_manager.deactivate_ldap_object(
-            f"cn=Not_exist_{RANDOM_STRING},o=root"
+            f"cn=Not_exist_{RANDOM_STRING},{WEBADM_BASE_DN}"
         )
     assert (
         str(excinfo)
         == f"<ExceptionInfo InternalError(\"LDAP object 'cn=Not_exist_{RANDOM_STRING},o=root' does not exist\") "
         f"tblen=3>"
+        or str(excinfo)
+        == f"<ExceptionInfo InternalError(\"LDAP object 'cn=Not_exist_{RANDOM_STRING},{WEBADM_BASE_DN}' "
+        f'does not exist") tblen=3>'
     )
 
     # Test to deactivate providing a malformed DN
@@ -260,21 +322,31 @@ def test_deactivate_ldap_object() -> None:
     assert (
         str(excinfo)
         == f"<ExceptionInfo InternalError(\"Could not read LDAP object '{RANDOM_STRING}' (invalid DN)\") tblen=3>"
+        or str(excinfo)
+        == f"<ExceptionInfo InternalError(\"Could not read LDAP object '{RANDOM_STRING}' (0000208F: "
+        "NameErr: DSID-03100233, problem 2006 (BAD_NAME), data 8350, best match of"
+        f":\\t'{RANDOM_STRING}')\") tblen=3>"
     )
 
     # Test to deactivate an activated account
     response = webadm_api_manager.deactivate_ldap_object(
-        f"cn=testuser3,{WEBADM_BASE_DN}"
+        f"cn=u_{CLUSTER_TYPE}_api_3,{WEBADM_BASE_DN}"
     )
-    assert response
+    if "metadata" in WEBADM_HOST:
+        assert not response
+    else:
+        assert response
 
-    with pytest.raises(pyrcdevs.manager.Manager.InternalError) as excinfo:
-        webadm_api_manager.deactivate_ldap_object(f"cn=testuser3,{WEBADM_BASE_DN}")
-    assert (
-        str(excinfo)
-        == f"<ExceptionInfo InternalError(\"Object 'cn=testuser3,{WEBADM_BASE_DN}' is not an activated user or group\")"
-        f" tblen=3>"
-    )
+    if "metadata" not in WEBADM_HOST:
+        with pytest.raises(pyrcdevs.manager.Manager.InternalError) as excinfo:
+            webadm_api_manager.deactivate_ldap_object(
+                f"cn=u_{CLUSTER_TYPE}_api_3,{WEBADM_BASE_DN}"
+            )
+        assert (
+            str(excinfo)
+            == f"<ExceptionInfo InternalError(\"Object 'cn=u_{CLUSTER_TYPE}_api_3,{WEBADM_BASE_DN}' is not an activated user or group\")"
+            f" tblen=3>"
+        )
 
 
 def test_cert_auto_confirm() -> None:
@@ -368,6 +440,10 @@ def test_check_ldap_object() -> None:
     assert (
         str(excinfo)
         == f"<ExceptionInfo InternalError(\"Could not read LDAP object '{RANDOM_STRING}' (invalid DN)\") tblen=3>"
+        or str(excinfo)
+        == f"<ExceptionInfo InternalError(\"Could not read LDAP object '{RANDOM_STRING}' (0000208F: "
+        "NameErr: DSID-03100233, problem 2006 (BAD_NAME), data 8350, best match of"
+        f":\\t'{RANDOM_STRING}')\") tblen=3>"
     )
 
     # Test with non existing DN object
@@ -378,7 +454,7 @@ def test_check_ldap_object() -> None:
 
     # Test with existing DN object
     check_ldap_object_response = webadm_api_manager.check_ldap_object(
-        f"cn=testuser1,{WEBADM_BASE_DN}"
+        f"cn=u_{CLUSTER_TYPE}_api_1,{WEBADM_BASE_DN}"
     )
     assert check_ldap_object_response
 
@@ -394,34 +470,42 @@ def test_check_user_active() -> None:
         # NOSONAR
     assert str(excinfo) == REGEX_PARAMETER_DN_NOT_STRING
 
-    # Test with malformed DN.
-    with pytest.raises(InternalError) as excinfo:
-        webadm_api_manager.check_user_active(RANDOM_STRING)
-    assert (
-        str(excinfo)
-        == f"<ExceptionInfo InternalError(\"Could not read LDAP object '{RANDOM_STRING}' (invalid DN)\") tblen=3>"
-    )
+    if "metadata" not in WEBADM_HOST:
+        # Test with malformed DN.
+        with pytest.raises(InternalError) as excinfo:
+            webadm_api_manager.check_user_active(RANDOM_STRING)
+        assert (
+            str(excinfo)
+            == f"<ExceptionInfo InternalError(\"Could not read LDAP object '{RANDOM_STRING}' (invalid DN)\") tblen=3>"
+            or str(excinfo)
+            == f"<ExceptionInfo InternalError(\"Could not read LDAP object '{RANDOM_STRING}' (0000208F: "
+            "NameErr: DSID-03100233, problem 2006 (BAD_NAME), data 8350, best match of"
+            f":\\t'{RANDOM_STRING}')\") tblen=3>"
+        )
 
-    # Test with non existing DN object
-    with pytest.raises(InternalError) as excinfo:
-        webadm_api_manager.check_user_active(f"cn={RANDOM_STRING},{WEBADM_BASE_DN}")
-    assert (
-        str(excinfo)
-        == f"<ExceptionInfo InternalError(\"Could not read LDAP object 'cn={RANDOM_STRING},{WEBADM_BASE_DN}' "
-        f'(No such object)") tblen=3>'
-    )
+        # Test with non existing DN object
+        with pytest.raises(InternalError) as excinfo:
+            webadm_api_manager.check_user_active(f"cn={RANDOM_STRING},{WEBADM_BASE_DN}")
+        assert (
+            str(excinfo)
+            == f"<ExceptionInfo InternalError(\"Could not read LDAP object 'cn={RANDOM_STRING},{WEBADM_BASE_DN}' "
+            f'(No such object)") tblen=3>'
+            or str(excinfo)
+            == f"<ExceptionInfo InternalError(\"Could not read LDAP object 'cn={RANDOM_STRING},"
+            f"{WEBADM_BASE_DN[:61]}..., data 0, best match of:\\t'{WEBADM_BASE_DN}')\") tblen=3>"
+        )
 
-    # Test with existing activated user object (testuser1)
-    check_ldap_object_response = webadm_api_manager.check_user_active(
-        f"cn=testuser1,{WEBADM_BASE_DN}"
-    )
-    assert check_ldap_object_response
+        # Test with existing activated user object (testuserapi1)
+        response = webadm_api_manager.check_user_active(
+            f"cn=u_{CLUSTER_TYPE}_api_1,{WEBADM_BASE_DN}"
+        )
+        assert response
 
-    # Test with existing unactivated user object (unactivated)
-    check_ldap_object_response = webadm_api_manager.check_user_active(
-        f"cn=unactivated,{WEBADM_BASE_DN}"
-    )
-    assert not check_ldap_object_response
+        # Test with existing unactivated user object (unactivated)
+        response = webadm_api_manager.check_user_active(
+            f"cn=u_{CLUSTER_TYPE}_unact,{WEBADM_BASE_DN}"
+        )
+        assert not response
 
 
 def test_check_user_password() -> None:
@@ -438,7 +522,9 @@ def test_check_user_password() -> None:
     # Test with wrong password type.
     with pytest.raises(InvalidParams) as excinfo:
         # noinspection PyTypeChecker
-        webadm_api_manager.check_user_password(f"cn=testuser1,{WEBADM_BASE_DN}", 1)
+        webadm_api_manager.check_user_password(
+            f"cn=u_{CLUSTER_TYPE}_api_1,{WEBADM_BASE_DN}", 1
+        )
         # NOSONAR
     assert (
         str(excinfo)
@@ -447,17 +533,21 @@ def test_check_user_password() -> None:
 
     # Test with malformed DN.
     with pytest.raises(InternalError) as excinfo:
-        webadm_api_manager.check_user_password(RANDOM_STRING, "password")
+        webadm_api_manager.check_user_password(RANDOM_STRING, DEFAULT_PASSWORD)
     assert (
         str(excinfo)
         == f"<ExceptionInfo InternalError(\"Could not read LDAP object '{RANDOM_STRING}' (invalid DN)\") tblen=3>"
+        or str(excinfo)
+        == f"<ExceptionInfo InternalError(\"Could not read LDAP object '{RANDOM_STRING}' "
+        f"(0000208F: NameErr: DSID-03100233, problem 2006 (BAD_NAME), data 8350, best match "
+        f"of:\\t'{RANDOM_STRING}')\") tblen=3>"
     )
 
     # Test with non existing DN object
     with pytest.raises(InternalError) as excinfo:
         webadm_api_manager.check_user_password(
             f"cn={RANDOM_STRING},{WEBADM_BASE_DN}",
-            "password",
+            DEFAULT_PASSWORD,
         )
     assert (
         str(excinfo)
@@ -467,15 +557,15 @@ def test_check_user_password() -> None:
 
     # Test with existing DN object, but a wrong password
     check_user_password_response = webadm_api_manager.check_user_password(
-        f"cn=testuser1,{WEBADM_BASE_DN}",
+        f"cn=u_{CLUSTER_TYPE}_api_1,{WEBADM_BASE_DN}",
         "wrong password",
     )
     assert not check_user_password_response
 
     # Test with existing DN object, and the right password
     check_user_password_response = webadm_api_manager.check_user_password(
-        f"cn=testuser1,{WEBADM_BASE_DN}",
-        "password",
+        f"cn=u_{CLUSTER_TYPE}_api_1,{WEBADM_BASE_DN}",
+        DEFAULT_PASSWORD,
     )
     assert check_user_password_response
 
@@ -616,7 +706,7 @@ def test_set_user_data() -> None:
     Test Set_User_Data method.
     """
     response = webadm_api_manager.set_user_data(
-        f"cn=testuser1,{WEBADM_BASE_DN}",
+        f"cn=u_{CLUSTER_TYPE}_api_1,{WEBADM_BASE_DN}",
         {
             "OpenOTP.EmergOTP": "4QrcOUm6Wau+VuBX8g+IPmZy2wOXWf+aAAA=",
             "SpanKey.PublicKey": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAq6UxOwHGPE0+O3bxOV64XNzmKPZTvW6O8zhxigi/3"
@@ -701,7 +791,10 @@ def test_count_domain_users() -> None:
     assert (
         isinstance(activated_users, int)
         and activated_users >= 0
-        and activated_users != all_users
+        and (
+            activated_users != all_users
+            or ("metadata" in WEBADM_HOST and activated_users == all_users)
+        )
     )
 
 
@@ -710,32 +803,14 @@ def test_set_user_attrs() -> None:
     Test Set_User_Attrs method.
     """
     response = webadm_api_manager.set_user_attrs(
-        f"cn=testuser1,{WEBADM_BASE_DN}",
+        f"cn=u_{CLUSTER_TYPE}_api_1,{WEBADM_BASE_DN}",
         {
             "usercertificate": [
-                "MIIGijCCBHKgAwIBAgIRAP+NV0Vn8TNb6UAXVkMerIMwDQYJKoZIhvcNAQELBQAwHjEcMBoGA1UEAwwTV2ViQURNIENBICM4NzQxNj"
-                "ExNzAeFw0yNDEyMjAxNjA5NTBaFw0yNTEyMjAxNjA5NTBaMIGWMRowGAYDVQQDDBFEZWZhdWx0XHRlc3R1c2VyMTEZMBcGCgmSJomT"
-                "8ixkAQEMCXRlc3R1c2VyMTEXMBUGCgmSJomT8ixkARkWB0RlZmF1bHQxFzAVBgNVBAoMDlJDRGV2cyBTdXBwb3J0MRcwFQYDVQRhDA"
-                "5WQVRMVS0wMDAwMDAwMDESMBAGA1UEBAwJdGVzdHVzZXIxMIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAzvZu5XWFDNiz"
-                "tin2srfW1gM1IlN/Y8AGXuhI9EK4glqqFFrCOr3nb/Qc5RfLsuiOqG84SVOW6RoIaqO+qa17tXgPa9VQrpdsmEGGD/0275QwEiU0Ke"
-                "52j3nXkKSPhfcVEsXBb73SUc1O569Bajp6b9NubhrgYX7+0VegQTw6uPfeNYHI3OrRSiT5rNeQwR869viSYGsUvTjIGepgIRlOxLoz"
-                "ddIP44yPHf0nC+3sbrfmuHT1l4Qc2NepzG1jnJ833Ogf/G4ZvMCYL774pRtYuLuVC2pn0aGuYmvxpJkCGSVWeZlY2Kf2Q2dxU4ubZM"
-                "boZKwWnbrFYgOedgxmLOmCLcj5Vjd8EdxBd08uuyqLslqO4kG0JXlZGK8s/CwUTYPlooRX4yvIFywGgxQ/RvuNS/POee5nkfTSXIlK"
-                "KwIOv1Bf4fNTnqVDjv4EM5jjvTtsYl48F0vBzt/XJXXzvRxdRHMjUg2+/iDEgHihuDPK5cSlPM4lTKaKRQ4nxS7T+UPjEVIMFfamQ8"
-                "Nq8FoZkkTA9VkbxJvyPHPaKaWK0espCChDbmCdhj77eKZfZyLpr5/PZmx3AHx+hh9YnXLpsE694xvV3KqcNeGTqcmgCsxvAlyzFj1d"
-                "l4W8mcO9c//lDfi1dQ7pxO7/2GqQuoFEhfVLWU92vu8Ro5PGAaleFKWBxzUCAwEAAaOCAUgwggFEMAsGA1UdDwQEAwIF4DApBgNVHS"
-                "UEIjAgBggrBgEFBQcDAgYIKwYBBQUHAwQGCisGAQQBgjcUAgIwHQYDVR0OBBYEFGPtlNCp8pTRtF/NntUOeTDwceckMIGVBggrBgEF"
-                "BQcBAQSBiDCBhTBHBggrBgEFBQcwAoY7aHR0cDovL2Nsb3VkLnJjZGV2cy5jb20vY2EvemZkZ2psc3pwZHpsYy9jYWNlcnQvP2Zvcm"
-                "1hdD1kZXIwOgYIKwYBBQUHMAGGLmh0dHA6Ly9jbG91ZC5yY2RldnMuY29tL2NhL3pmZGdqbHN6cGR6bGMvb2NzcC8wPgYDVR0fBDcw"
-                "NTAzoDGgL4YtaHR0cDovL2Nsb3VkLnJjZGV2cy5jb20vY2EvemZkZ2psc3pwZHpsYy9jcmwvMBMGCysGAQQBgo45AwEBBARVU0VSMA"
-                "0GCSqGSIb3DQEBCwUAA4ICAQB6dts21Zx61Hrapfm6TgnNqleAbdPhsHn06JjDfrKMKvZGplPhqWj0zj3G4yS8CcgY9ySdi3i6ZCCf"
-                "dffJ6uLc+6Rw+borEvUJyn1D2SZR1g9I3BT27mYdsm7+u17QTzqrabHO59Emw/BoGUPv1Ikn7T7vidTFHhbzsUf4bzu2jI3zV8Q76x"
-                "QwsQ+2ER87AHKtr4Y0TARmOyQGOrQu1D+32aWLU83XWZrzqbcUlVpRUYtyFgiUitmiIP7EKilLCkXBFLY726zU1M5ctS7PWKzuOpvR"
-                "T7Jn0mM1qyqvDufLyn+333kjkx97Au33hqDF8A4k7kHyb4qzJkMRE5cCCDmubI/3o5IVdDVpuyI2bQlwYCj0IJvrm5OqOLcRewXEb+"
-                "lACy1K0408FmKtcGGIEbXGx1KwZp0gaCg9cd++BfL1XDSjpwmBt43O9CzOv60V4ufG99s/63MMYKVLQNSS0uqUpw8nnXPKlNbBwFOK"
-                "Dy4wAnQskDLSD6dKvw5SEcpXk7U9fQRMTIRQ88kVRmvcqXC6lieA4nII5Mat0TaN8omOtTj1Q9LwhF6WagRrijFE3ihGQDbXXAT6tK"
-                "tuL/tLW2BKwa2u66WZu+zA4E9QNnhsdFyYkpqE4xElu7YbCcc8ncSTX4oiRtmTvpfgvKGlVHeg5KP+3OaKuG4P7UvHIEMiEw=="
-            ],
+                repr(USER_CERTIFICATES[CLUSTER_TYPE])
+                .replace("\\n", "")
+                .replace("-----BEGIN CERTIFICATE-----", "")
+                .replace("-----END CERTIFICATE-----", "")
+            ]
         },
     )
     assert response

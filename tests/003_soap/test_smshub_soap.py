@@ -14,15 +14,15 @@ from tests.constants import (
     RANDOM_STRING,
     REGEX_STATUS_RESPONSE,
     WEBADM_HOST,
-    WEBADM_API_KEY,
-    SMS_MOBILE,
+    OPENOTP_API_KEY,
+    SMS_MOBILE, SMSHUB_API_KEY,
 )
 
 smshub_soap_api = SMSHubSoap(
     WEBADM_HOST,
     "8443",
     False,
-    api_key=WEBADM_API_KEY,
+    api_key=SMSHUB_API_KEY,
 )
 
 
@@ -36,6 +36,7 @@ def test_status() -> None:
     assert re.compile(REGEX_STATUS_RESPONSE).search(repr(response["message"]))
 
 
+@pytest.mark.skip("Avoid using SMS credit")
 def test_send() -> None:
     """
     Test smshubSend method.
@@ -119,6 +120,7 @@ def test_send() -> None:
     assert str(excinfo) == "<ExceptionInfo TypeError('type_ is not SMSType') tblen=2>"
 
 
+@pytest.mark.skip("Avoid using SMS credit")
 def test_sign() -> None:
     """
     Test smshubSign method.
