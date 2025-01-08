@@ -5,15 +5,11 @@ from requests.exceptions import ConnectionError, ConnectTimeout
 from urllib3.exceptions import MaxRetryError, NewConnectionError
 
 from pyrcdevs import OpenOTPSoap
-from pyrcdevs.soap.SOAP import InvalidAPICredentials, InvalidParams, InvalidSOAPContent
-from tests.constants import (
-    WEBADM_HOST,
-    RANDOM_STRING,
-    REGEX_FAILED_TO_RESOLVE,
-    REGEX_CONNECTION_REFUSED,
-    REGEX_CONNECT_TIMEOUT,
-    REGEX_MAX_RETRY,
-)
+from pyrcdevs.soap.SOAP import (InvalidAPICredentials, InvalidParams,
+                                InvalidSOAPContent)
+from tests.constants import (RANDOM_STRING, REGEX_CONNECT_TIMEOUT,
+                             REGEX_CONNECTION_REFUSED, REGEX_FAILED_TO_RESOLVE,
+                             REGEX_MAX_RETRY, WEBADM_HOST)
 
 
 def test_wrong_host() -> None:

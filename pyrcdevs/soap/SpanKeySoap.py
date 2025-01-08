@@ -3,8 +3,8 @@
 import re
 from enum import Enum
 
+from pyrcdevs.constants import KEY_NS2_MAP, REGEX_BASE64
 from pyrcdevs.soap.SOAP import SOAP
-from pyrcdevs.constants import REGEX_BASE64, KEY_NS2_MAP
 
 
 def reconstruct_nss_data(response):

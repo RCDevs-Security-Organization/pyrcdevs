@@ -3,7 +3,8 @@
 from enum import Enum
 from typing import Any
 
-from pyrcdevs.constants import MSG_MAXUSE_POSSIBLE_VALUES, MSG_EXPIRES_POSSIBLE_VALUES
+from pyrcdevs.constants import (MSG_EXPIRES_POSSIBLE_VALUES,
+                                MSG_MAXUSE_POSSIBLE_VALUES)
 from pyrcdevs.manager.Manager import Manager
 
 

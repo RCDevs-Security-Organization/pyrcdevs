@@ -5,8 +5,10 @@ from requests.exceptions import ConnectionError, ConnectTimeout
 from urllib3.exceptions import MaxRetryError, NewConnectionError
 
 from pyrcdevs import WebADMManager
-from tests.constants import REGEX_FAILED_TO_RESOLVE, REGEX_CONNECTION_REFUSED, REGEX_CONNECT_TIMEOUT, REGEX_MAX_RETRY, \
-    WEBADM_API_USERNAME, WEBADM_API_PASSWORD, WEBADM_HOST
+from tests.constants import (REGEX_CONNECT_TIMEOUT, REGEX_CONNECTION_REFUSED,
+                             REGEX_FAILED_TO_RESOLVE, REGEX_MAX_RETRY,
+                             WEBADM_API_PASSWORD, WEBADM_API_USERNAME,
+                             WEBADM_HOST)
 
 
 def test_wrong_host() -> None:

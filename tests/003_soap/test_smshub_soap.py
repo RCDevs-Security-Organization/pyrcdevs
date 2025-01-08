@@ -7,16 +7,10 @@ import pytest
 
 from pyrcdevs import SMSHubSoap
 from pyrcdevs.soap.SMSHubSoap import SMSType
-from tests.constants import (
-    MSG_SMS_SENT,
-    MSG_INVALID_SMS_REQUEST,
-    MSG_INVALID_USERNAME,
-    RANDOM_STRING,
-    REGEX_STATUS_RESPONSE,
-    WEBADM_HOST,
-    OPENOTP_API_KEY,
-    SMS_MOBILE, SMSHUB_API_KEY,
-)
+from tests.constants import (MSG_INVALID_SMS_REQUEST, MSG_INVALID_USERNAME,
+                             MSG_SMS_SENT, OPENOTP_API_KEY, RANDOM_STRING,
+                             REGEX_STATUS_RESPONSE, SMS_MOBILE, SMSHUB_API_KEY,
+                             WEBADM_HOST)
 
 smshub_soap_api = SMSHubSoap(
     WEBADM_HOST,

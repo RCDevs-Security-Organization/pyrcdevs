@@ -373,7 +373,7 @@ class WebADMManager(Manager):
         type_: ConfigObjectType,
         settings: bool = None,
         application: ConfigObjectApplication = None,
-    ) -> list | dict:
+    ) -> list or dict:
         """
         Return configuration of WebADM objects.
 
@@ -398,7 +398,9 @@ class WebADMManager(Manager):
         response = super().handle_api_manager_request("Get_Config_Objects", params)
         return response
 
-    def get_event_logs(self, application, max_=None, dn=None) -> list:
+    def get_event_logs(
+        self, application: EventLogApplication, max_: int = None, dn: str = None
+    ) -> list:
         """
         Fetch SQL log events for the specified application.
 
@@ -409,7 +411,7 @@ class WebADMManager(Manager):
         :rtype: list
         """
         if not isinstance(application, EventLogApplication):
-            raise TypeError("application type is not EventLogApplication")
+            raise TypeError(MSG_NOT_RIGHT_TYPE.format('application', 'EventLogApplication'))
         if max_ is not None and (not isinstance(max_, int) or max_ < 1):
             raise TypeError("max is not a positive int!")
         params = {"application": application.value}

@@ -1,3 +1,3 @@
-from .manager import (OpenOTPManager, PwResetManager, SelfRegManager,
-                      SpanKeyManager, WebADMManager, Manager)
+from .manager import (Manager, OpenOTPManager, PwResetManager, SelfRegManager,
+                      SpanKeyManager, WebADMManager)
 from .soap import OpenOTPSoap, SMSHubSoap, SpanKeySoap

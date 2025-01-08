@@ -3,8 +3,9 @@
 import re
 from enum import Enum
 
+from pyrcdevs.constants import (MSG_NOT_RIGHT_TYPE, REGEX_BASE64,
+                                TYPE_BASE64_STRING)
 from pyrcdevs.soap.SOAP import SOAP
-from pyrcdevs.constants import REGEX_BASE64, MSG_NOT_RIGHT_TYPE, TYPE_BASE64_STRING
 
 
 class QRCodeFormat(Enum):
@@ -444,7 +445,7 @@ class OpenOTPSoap(SOAP):
         This method sends a request for advanced or qualified signature.
 
         The fact that an advanced signature or a qualified signature is requested is related to an OpenOTP SOAP
-        setting named “Signature Validity scope (SignScope)”. That setting is controllable by the client system
+        setting named Signature Validity scope (SignScope). That setting is controllable by the client system
         sending the signature request to OpenOTP SOAP API or by client policy and can have 3 values:
         Local: Advanced signature with user certificates issued by internal WebADM CA. This should be used for internal
         signatories.

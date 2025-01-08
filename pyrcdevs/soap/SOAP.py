@@ -7,7 +7,7 @@ import requests
 import requests_pkcs12
 import xmltodict
 
-from pyrcdevs.constants import XML_SOAP_ENVELOP, XML_SOAP_BODY
+from pyrcdevs.constants import XML_SOAP_BODY, XML_SOAP_ENVELOP
 
 
 class InvalidAPICredentials(Exception):
