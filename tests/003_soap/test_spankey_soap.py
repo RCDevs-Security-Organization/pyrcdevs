@@ -19,7 +19,7 @@ from tests.constants import (AUDITD_COMMAND, CLUSTER_TYPE, DEFAULT_PASSWORD,
 
 spankey_soap_api = SpanKeySoap(
     WEBADM_HOST,
-    "8443",
+    8443,
     False,
     api_key=SPANKEY_API_KEY,
 )

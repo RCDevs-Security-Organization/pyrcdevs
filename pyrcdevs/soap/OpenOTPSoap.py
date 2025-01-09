@@ -32,19 +32,19 @@ class OpenOTPSoap(SOAP):
 
     def __init__(
         self,
-        host,
-        port,
-        verify=True,
-        p12_file_path=None,
-        p12_password=None,
-        api_key=None,
-        timeout=30,
+        host: str,
+        port: int = 8443,
+        verify: bool | str = True,
+        p12_file_path: str = None,
+        p12_password: str = None,
+        api_key: str = None,
+        timeout: int = 30,
     ) -> None:
         """
         Construct OpenOTPSoap class.
 
         :param str host: path to the db file
-        :param str port: listening port of OpenOTP server
+        :param int port: listening port of OpenOTP server
         :param bool|str verify: Either boolean (verify or not TLS certificate), or path (str) to
         CA certificate
         :param str p12_file_path: path to pkcs12 file used when TLS client auth is required
@@ -53,7 +53,7 @@ class OpenOTPSoap(SOAP):
         :param int timeout: timeout of connection
         """
         super().__init__(
-            host, port, verify, "openotp", p12_file_path, p12_password, api_key, timeout
+            host, verify, "openotp", port, p12_file_path, p12_password, api_key, timeout
         )
 
     def simple_login(

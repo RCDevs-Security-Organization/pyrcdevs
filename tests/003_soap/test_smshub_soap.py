@@ -14,7 +14,7 @@ from tests.constants import (MSG_INVALID_SMS_REQUEST, MSG_INVALID_USERNAME,
 
 smshub_soap_api = SMSHubSoap(
     WEBADM_HOST,
-    "8443",
+    8443,
     False,
     api_key=SMSHUB_API_KEY,
 )

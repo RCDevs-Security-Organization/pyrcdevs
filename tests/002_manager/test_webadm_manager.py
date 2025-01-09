@@ -47,6 +47,7 @@ def generate_user_attrs(
         "uid": username,
     }
     if None not in (uid_number, gid_number):
+        # noinspection PyUnresolvedReferences
         user_attributes["objectclass"].append("posixAccount")
         user_attributes["uidnumber"] = uid_number
         user_attributes["gidnumber"] = gid_number

@@ -46,7 +46,7 @@ from tests.constants import (
 
 openotp_soap_api = OpenOTPSoap(
     WEBADM_HOST,
-    "8443",
+    8443,
     False,
     api_key=OPENOTP_API_KEY,
 )

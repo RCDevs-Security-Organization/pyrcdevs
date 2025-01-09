@@ -14,7 +14,7 @@ from tests.constants import (RANDOM_STRING, REGEX_CONNECT_TIMEOUT,
 
 def test_wrong_host() -> None:
     with pytest.raises(ConnectionError) as excinfo:
-        OpenOTPSoap("wrong_host", "8443", False).status()
+        OpenOTPSoap("wrong_host", 8443, False).status()
     assert re.compile(REGEX_FAILED_TO_RESOLVE).search(str(excinfo.value))
 
 
@@ -22,7 +22,7 @@ def test_wrong_ip() -> None:
     with pytest.raises(ConnectionError) as excinfo:
         OpenOTPSoap(
             "127.56.18.94",
-            "8443",
+            8443,
             False,
             timeout=2,
         ).status()
@@ -36,7 +36,7 @@ def test_wrong_port() -> None:
     ) as excinfo:
         OpenOTPSoap(
             WEBADM_HOST,
-            "6666",
+            6666,
             False,
             timeout=2,
         ).status()
@@ -51,7 +51,7 @@ def test_p12_api_key_together() -> None:
     with pytest.raises(InvalidParams) as excinfo:
         OpenOTPSoap(
             WEBADM_HOST,
-            "8443",
+            8443,
             False,
             p12_file_path="/dev/null",
             p12_password="password",
@@ -67,7 +67,7 @@ def test_wrong_p12_file() -> None:
     with pytest.raises(ValueError) as excinfo:
         OpenOTPSoap(
             WEBADM_HOST,
-            "8443",
+            8443,
             False,
             p12_file_path="/dev/null",
             p12_password=RANDOM_STRING,
@@ -80,7 +80,7 @@ def test_wrong_p12_password() -> None:
     with pytest.raises(ValueError) as excinfo:
         OpenOTPSoap(
             WEBADM_HOST,
-            "8443",
+            8443,
             False,
             p12_file_path="./clientsoap.p12",
             p12_password=RANDOM_STRING,
@@ -93,7 +93,7 @@ def test_wrong_api_key() -> None:
     with pytest.raises(InvalidAPICredentials) as excinfo:
         OpenOTPSoap(
             WEBADM_HOST,
-            "8443",
+            8443,
             False,
             api_key=RANDOM_STRING,
             timeout=2,
@@ -105,7 +105,7 @@ def test_wrong_soap_response() -> None:
     with pytest.raises(InvalidSOAPContent) as excinfo:
         OpenOTPSoap(
             WEBADM_HOST,
-            "443",
+            443,
             False,
             api_key="5860687476061196336_d788fd99ea4868f35c3b5e21ada3920b9501bb2c",
             timeout=2,

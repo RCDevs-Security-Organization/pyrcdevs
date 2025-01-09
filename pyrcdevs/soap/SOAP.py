@@ -60,32 +60,32 @@ class SOAP:
 
     def __init__(
         self,
-        host,
-        port,
-        verify,
-        service,
-        p12_file_path=None,
-        p12_password=None,
-        api_key=None,
-        timeout=10,
+        host: str,
+        verify: bool | str,
+        service: str,
+        port: int = 8443,
+        p12_file_path: str = None,
+        p12_password: str = None,
+        api_key: str = None,
+        timeout: int = 10,
     ) -> None:
         """
         Construct Manager class.
 
         :param str host: path to the db file
-        :param str port: listening port of WebADM server
         :param bool|str verify: Either boolean (verify or not TLS certificate), or path (str) to
         CA certificate
         :param str service: endpoint
+        :param int port: listening port of WebADM server (Default to 8443)
         :param str p12_file_path: path to pkcs12 file used when TLS client auth is required
         :param str p12_password: password of pkcs12 file
         :param str api_key: API key
         :param int timeout: timeout of connection
         """
         self.host = host
-        self.port = port
         self.verify = verify
         self.service = service.lower()
+        self.port = port
         self.timeout = timeout
         if (
             p12_file_path is not None or p12_password is not None
@@ -140,7 +140,9 @@ class SOAP:
             )
 
         if response.status_code == 401:
-            raise InvalidAPICredentials("Invalid client certificate" if self.client_auth else "Invalid API key")
+            raise InvalidAPICredentials(
+                "Invalid client certificate" if self.client_auth else "Invalid API key"
+            )
 
         try:
             soap_reponse = xmltodict.parse(response.content)
