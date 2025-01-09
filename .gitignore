@@ -13,6 +13,7 @@
 !README.md
 !pyproject.toml
 !clientsoap.p12
+!LICENSE
 
 __pycache__
 docs/build
