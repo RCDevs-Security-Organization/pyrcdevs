@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pyrcdevs"
-version = "1.0.0"
+version = "1.1.0"
 description = "Python library for using the RCDevs API (Manager and SOAP APIs)"
 authors = ["RCDevs Security <devel@rcdevs.com>"]
 maintainers = ["Benoît Jager"]
