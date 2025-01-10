@@ -14,7 +14,7 @@ from tests.constants import (REGEX_CONNECT_TIMEOUT, REGEX_CONNECTION_REFUSED,
 def test_wrong_host() -> None:
     with pytest.raises(ConnectionError) as excinfo:
         WebADMManager(
-            "wrong_host", "443", WEBADM_API_USERNAME, WEBADM_API_PASSWORD, False
+            "wrong_host", WEBADM_API_USERNAME, WEBADM_API_PASSWORD, 443, False
         )
     assert re.compile(REGEX_FAILED_TO_RESOLVE).search(str(excinfo.value))
 
@@ -23,9 +23,9 @@ def test_wrong_ip() -> None:
     with pytest.raises(ConnectionError) as excinfo:
         WebADMManager(
             "127.56.18.94",
-            "443",
             WEBADM_API_USERNAME,
             WEBADM_API_PASSWORD,
+            443,
             False,
             timeout=2,
         )
@@ -39,9 +39,9 @@ def test_wrong_port() -> None:
     ) as excinfo:
         WebADMManager(
             WEBADM_HOST,
-            "6666",
             WEBADM_API_USERNAME,
             WEBADM_API_PASSWORD,
+            6666,
             False,
             timeout=2,
         )

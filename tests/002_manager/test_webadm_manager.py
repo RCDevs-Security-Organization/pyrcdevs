@@ -25,7 +25,7 @@ from tests.constants import (CLUSTER_TYPE, DEFAULT_PASSWORD, GROUP_OBJECTCLASS,
                              WEBADM_BASE_DN, WEBADM_HOST)
 
 webadm_api_manager = WebADMManager(
-    WEBADM_HOST, "443", WEBADM_API_USERNAME, WEBADM_API_PASSWORD, False
+    WEBADM_HOST, WEBADM_API_USERNAME, WEBADM_API_PASSWORD, 443, False
 )
 
 

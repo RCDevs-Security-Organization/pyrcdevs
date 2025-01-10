@@ -71,26 +71,26 @@ class Manager:
 
     def __init__(
         self,
-        host,
-        port,
-        username,
-        password,
-        verify,
-        p12_file_path,
-        p12_password,
-        timeout,
+        host: str,
+        username: str,
+        password: str,
+        verify: bool | str,
+        p12_file_path: str,
+        p12_password: str,
+        timeout: int,
+        port: int = 443,
     ) -> None:
         """
         Construct Manager class.
 
         :param str host: path to the db file
-        :param str port: listening port of WebADM server
         :param str username: username for API authentication
         :param str password: password for API authentication
         :param bool|str verify: Either boolean (verify or not TLS certificate), or path (str) to
         CA certificate
         :param str p12_file_path: path to pkcs12 file used when TLS client auth is required
         :param str p12_password: password of pkcs12 file
+        :param int port: listening port of WebADM server
         """
         self.host = host
         self.port = port

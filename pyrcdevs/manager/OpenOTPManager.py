@@ -56,29 +56,29 @@ class OpenOTPManager(Manager):
 
     def __init__(
         self,
-        host,
-        port,
-        username,
-        password,
-        verify=True,
-        p12_file_path=None,
-        p12_password=None,
-        timeout=30,
+        host: str,
+        username: str,
+        password: str,
+        port: int = 443,
+        verify: bool | str = True,
+        p12_file_path: str = None,
+        p12_password: str = None,
+        timeout: int = 30,
     ) -> None:
         """
         Construct OpenOTPManager class.
 
         :param str host: path to the db file
-        :param str port: listening port of OpenOTP server
         :param str username: username for API authentication
         :param str password: password for API authentication
+        :param int port: listening port of OpenOTP server
         :param bool|str verify: Either boolean (verify or not TLS certificate), or path (str) to
         CA certificate
         :param str p12_file_path: path to pkcs12 file used when TLS client auth is required
         :param str p12_password: password of pkcs12 file
         """
         super().__init__(
-            host, port, username, password, verify, p12_file_path, p12_password, timeout
+            host, username, password, verify, p12_file_path, p12_password, timeout, port
         )
 
     def appkey_fetch(self, dn) -> list:
@@ -1239,5 +1239,7 @@ class OpenOTPManager(Manager):
         params = {"dn": dn}
         if id_ is not None:
             params["id"] = id_
-        response = super().handle_api_manager_request("OpenOTPManager.Yubikey_Reset", params)
+        response = super().handle_api_manager_request(
+            "OpenOTPManager.Yubikey_Reset", params
+        )
         return response
