@@ -111,7 +111,7 @@ def test_create_ldap_object() -> None:
     # Test creating object in non existing container
     with pytest.raises(pyrcdevs.manager.Manager.InternalError) as excinfo:
         webadm_api_manager.create_ldap_object(
-            f"cn=testfail,ou={RANDOM_STRING},{WEBADM_BASE_DN}",
+            f"CN=testfail,OU={RANDOM_STRING},{WEBADM_BASE_DN}",
             {
                 "objectclass": ["person", "inetorgperson"],
                 "sn": "testfail",
@@ -123,20 +123,20 @@ def test_create_ldap_object() -> None:
 
     assert (
         str(excinfo)
-        == f"<ExceptionInfo InternalError(\"Could not create LDAP object 'cn=testfail,ou={RANDOM_STRING},"
+        == f"<ExceptionInfo InternalError(\"Could not create LDAP object 'CN=testfail,OU={RANDOM_STRING},"
         f"{WEBADM_BASE_DN}' (No such object)\") tblen=3>"
         or str(excinfo)
-        == f"<ExceptionInfo InternalError(\"Could not create LDAP object 'cn=testfail,ou={RANDOM_STRING},"
+        == f"<ExceptionInfo InternalError(\"Could not create LDAP object 'CN=testfail,OU={RANDOM_STRING},"
         f"{WEBADM_BASE_DN[:47]}..., data 0, best match of:\\t'{LDAP_BASE_DN}')\") tblen=3>"
         or str(excinfo.value)
-        == f"Could not create LDAP object 'cn=testfail,ou={RANDOM_STRING},{WEBADM_BASE_DN}' "
+        == f"Could not create LDAP object 'CN=testfail,OU={RANDOM_STRING},{WEBADM_BASE_DN}' "
         f"(0000208D: NameErr: DSID-0310028D, problem 2001 (NO_OBJECT), data 0, best match "
         f"of:\t'{LDAP_BASE_DN}')"
     )
 
     # Test creating testfail object with no attribute information
     response = webadm_api_manager.create_ldap_object(
-        f"cn=testfail,{WEBADM_BASE_DN}",
+        f"CN=testfail,{WEBADM_BASE_DN}",
         {},
     )
     assert not response
@@ -146,7 +146,7 @@ def test_create_ldap_object() -> None:
         f"u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1", 500, 100
     )
     response = webadm_api_manager.create_ldap_object(
-        f"cn=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}",
+        f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}",
         user_attributes,
     )
     assert response
@@ -156,7 +156,7 @@ def test_create_ldap_object() -> None:
         f"u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_2", 501, 100
     )
     response = webadm_api_manager.create_ldap_object(
-        f"cn=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_2,{WEBADM_BASE_DN}",
+        f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_2,{WEBADM_BASE_DN}",
         user_attributes,
     )
     assert response
@@ -166,7 +166,7 @@ def test_create_ldap_object() -> None:
         f"u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_3"
     )
     response = webadm_api_manager.create_ldap_object(
-        f"cn=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_3,{WEBADM_BASE_DN}",
+        f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_3,{WEBADM_BASE_DN}",
         user_attributes,
     )
     assert response
@@ -176,7 +176,7 @@ def test_create_ldap_object() -> None:
         f"u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_4"
     )
     response = webadm_api_manager.create_ldap_object(
-        f"cn=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_4,{WEBADM_BASE_DN}",
+        f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_4,{WEBADM_BASE_DN}",
         user_attributes,
     )
     assert response
@@ -185,19 +185,19 @@ def test_create_ldap_object() -> None:
     with pytest.raises(pyrcdevs.manager.Manager.InternalError) as excinfo:
         user_attributes = generate_user_attrs(f"u_{CLUSTER_TYPE}_api_1", 500, 100)
         webadm_api_manager.create_ldap_object(
-            f"cn=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}",
+            f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}",
             user_attributes,
         )
     assert (
         str(excinfo)
-        == f"<ExceptionInfo InternalError(\"LDAP object 'cn=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,"
+        == f"<ExceptionInfo InternalError(\"LDAP object 'CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,"
         f"{WEBADM_BASE_DN}' already exist\") tblen=3>"
     )
 
     # Test creating unactivated object
     user_attributes = generate_user_attrs(f"u_{CLUSTER_TYPE}_unact")
     response = webadm_api_manager.create_ldap_object(
-        f"cn=u_{CLUSTER_TYPE}_unact,{WEBADM_BASE_DN}",
+        f"CN=u_{CLUSTER_TYPE}_unact,{WEBADM_BASE_DN}",
         user_attributes,
     )
     assert response
@@ -205,7 +205,7 @@ def test_create_ldap_object() -> None:
     # Test creating testgroup1 object
     group_attributes = generate_group_attrs(f"g_{CLUSTER_TYPE}_api_1", 100)
     response = webadm_api_manager.create_ldap_object(
-        f"cn=g_{CLUSTER_TYPE}_api_1,{WEBADM_BASE_DN}",
+        f"CN=g_{CLUSTER_TYPE}_api_1,{WEBADM_BASE_DN}",
         group_attributes,
     )
     assert response
@@ -213,7 +213,7 @@ def test_create_ldap_object() -> None:
     # Test creating testgroup2 object
     group_attributes = generate_group_attrs(f"g_{CLUSTER_TYPE}_api_2", 101)
     response = webadm_api_manager.create_ldap_object(
-        f"cn=g_{CLUSTER_TYPE}_api_2,{WEBADM_BASE_DN}",
+        f"CN=g_{CLUSTER_TYPE}_api_2,{WEBADM_BASE_DN}",
         group_attributes,
     )
     assert response
@@ -227,14 +227,14 @@ def test_activate_ldap_object() -> None:
 
     with pytest.raises(pyrcdevs.manager.Manager.InternalError) as excinfo:
         webadm_api_manager.activate_ldap_object(
-            f"cn=Not_exist_{RANDOM_STRING},{WEBADM_BASE_DN}"
+            f"CN=Not_exist_{RANDOM_STRING},{WEBADM_BASE_DN}"
         )
     assert (
         str(excinfo)
-        == f"<ExceptionInfo InternalError(\"LDAP object 'cn=Not_exist_{RANDOM_STRING},o=root' does not exist\") "
+        == f"<ExceptionInfo InternalError(\"LDAP object 'CN=Not_exist_{RANDOM_STRING},o=root' does not exist\") "
         f"tblen=3>"
         or str(excinfo)
-        == f"<ExceptionInfo InternalError(\"LDAP object 'cn=Not_exist_{RANDOM_STRING},{WEBADM_BASE_DN}' "
+        == f"<ExceptionInfo InternalError(\"LDAP object 'CN=Not_exist_{RANDOM_STRING},{WEBADM_BASE_DN}' "
         'does not exist") tblen=3>'
     )
 
@@ -252,7 +252,7 @@ def test_activate_ldap_object() -> None:
 
     # Test to activate existing account
     response = webadm_api_manager.activate_ldap_object(
-        f"cn=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}"
+        f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}"
     )
     if "metadata" in WEBADM_HOST:
         assert not response
@@ -261,7 +261,7 @@ def test_activate_ldap_object() -> None:
 
     # Test to activate existing account
     response = webadm_api_manager.activate_ldap_object(
-        f"cn=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_3,{WEBADM_BASE_DN}"
+        f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_3,{WEBADM_BASE_DN}"
     )
     if "metadata" in WEBADM_HOST:
         assert not response
@@ -270,7 +270,7 @@ def test_activate_ldap_object() -> None:
 
     # Test to activate existing account
     response = webadm_api_manager.activate_ldap_object(
-        f"cn=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_4,{WEBADM_BASE_DN}"
+        f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_4,{WEBADM_BASE_DN}"
     )
     if "metadata" in WEBADM_HOST:
         assert not response
@@ -279,13 +279,13 @@ def test_activate_ldap_object() -> None:
 
     # Test to activate existing account already activated
     response = webadm_api_manager.activate_ldap_object(
-        f"cn=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}"
+        f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}"
     )
     assert not response
 
     # Test to activate existing group
     response = webadm_api_manager.activate_ldap_object(
-        f"cn=g_{CLUSTER_TYPE}_api_1,{WEBADM_BASE_DN}"
+        f"CN=g_{CLUSTER_TYPE}_api_1,{WEBADM_BASE_DN}"
     )
     if "metadata" in WEBADM_HOST:
         assert not response
@@ -294,7 +294,7 @@ def test_activate_ldap_object() -> None:
 
     # Test to activate existing group
     response = webadm_api_manager.activate_ldap_object(
-        f"cn=g_{CLUSTER_TYPE}_api_2,{WEBADM_BASE_DN}"
+        f"CN=g_{CLUSTER_TYPE}_api_2,{WEBADM_BASE_DN}"
     )
     if "metadata" in WEBADM_HOST:
         assert not response
@@ -303,7 +303,7 @@ def test_activate_ldap_object() -> None:
 
     # Test to activate existing group already activated
     response = webadm_api_manager.activate_ldap_object(
-        f"cn=g_{CLUSTER_TYPE}_api_1,{WEBADM_BASE_DN}"
+        f"CN=g_{CLUSTER_TYPE}_api_1,{WEBADM_BASE_DN}"
     )
     assert not response
 
@@ -316,14 +316,14 @@ def test_deactivate_ldap_object() -> None:
 
     with pytest.raises(pyrcdevs.manager.Manager.InternalError) as excinfo:
         webadm_api_manager.deactivate_ldap_object(
-            f"cn=Not_exist_{RANDOM_STRING},{WEBADM_BASE_DN}"
+            f"CN=Not_exist_{RANDOM_STRING},{WEBADM_BASE_DN}"
         )
     assert (
         str(excinfo)
-        == f"<ExceptionInfo InternalError(\"LDAP object 'cn=Not_exist_{RANDOM_STRING},o=root' does not exist\") "
+        == f"<ExceptionInfo InternalError(\"LDAP object 'CN=Not_exist_{RANDOM_STRING},o=root' does not exist\") "
         f"tblen=3>"
         or str(excinfo)
-        == f"<ExceptionInfo InternalError(\"LDAP object 'cn=Not_exist_{RANDOM_STRING},{WEBADM_BASE_DN}' "
+        == f"<ExceptionInfo InternalError(\"LDAP object 'CN=Not_exist_{RANDOM_STRING},{WEBADM_BASE_DN}' "
         f'does not exist") tblen=3>'
     )
 
@@ -341,7 +341,7 @@ def test_deactivate_ldap_object() -> None:
 
     # Test to deactivate an activated account
     response = webadm_api_manager.deactivate_ldap_object(
-        f"cn=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_3,{WEBADM_BASE_DN}"
+        f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_3,{WEBADM_BASE_DN}"
     )
     if "metadata" in WEBADM_HOST:
         assert not response
@@ -351,11 +351,11 @@ def test_deactivate_ldap_object() -> None:
     if "metadata" not in WEBADM_HOST:
         with pytest.raises(pyrcdevs.manager.Manager.InternalError) as excinfo:
             webadm_api_manager.deactivate_ldap_object(
-                f"cn=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_3,{WEBADM_BASE_DN}"
+                f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_3,{WEBADM_BASE_DN}"
             )
         assert (
             str(excinfo)
-            == f"<ExceptionInfo InternalError(\"Object 'cn=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_3,"
+            == f"<ExceptionInfo InternalError(\"Object 'CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_3,"
             f"{WEBADM_BASE_DN}' is not an activated user or group\") tblen=3>"
         )
 
@@ -459,13 +459,13 @@ def test_check_ldap_object() -> None:
 
     # Test with non existing DN object
     check_ldap_object_response = webadm_api_manager.check_ldap_object(
-        f"cn={RANDOM_STRING},{WEBADM_BASE_DN}"
+        f"CN={RANDOM_STRING},{WEBADM_BASE_DN}"
     )
     assert not check_ldap_object_response
 
     # Test with existing DN object
     check_ldap_object_response = webadm_api_manager.check_ldap_object(
-        f"cn=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}"
+        f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}"
     )
     assert check_ldap_object_response
 
@@ -496,25 +496,25 @@ def test_check_user_active() -> None:
 
         # Test with non existing DN object
         with pytest.raises(InternalError) as excinfo:
-            webadm_api_manager.check_user_active(f"cn={RANDOM_STRING},{WEBADM_BASE_DN}")
+            webadm_api_manager.check_user_active(f"CN={RANDOM_STRING},{WEBADM_BASE_DN}")
         assert (
             str(excinfo)
-            == f"<ExceptionInfo InternalError(\"Could not read LDAP object 'cn={RANDOM_STRING},{WEBADM_BASE_DN}' "
+            == f"<ExceptionInfo InternalError(\"Could not read LDAP object 'CN={RANDOM_STRING},{WEBADM_BASE_DN}' "
             f'(No such object)") tblen=3>'
             or str(excinfo)
-            == f"<ExceptionInfo InternalError(\"Could not read LDAP object 'cn={RANDOM_STRING},"
+            == f"<ExceptionInfo InternalError(\"Could not read LDAP object 'CN={RANDOM_STRING},"
             f"{WEBADM_BASE_DN[:61]}..., data 0, best match of:\\t'{WEBADM_BASE_DN}')\") tblen=3>"
         )
 
         # Test with existing activated user object (testuserapi1)
         response = webadm_api_manager.check_user_active(
-            f"cn=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}"
+            f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}"
         )
         assert response
 
         # Test with existing unactivated user object (unactivated)
         response = webadm_api_manager.check_user_active(
-            f"cn=u_{CLUSTER_TYPE}_unact,{WEBADM_BASE_DN}"
+            f"CN=u_{CLUSTER_TYPE}_unact,{WEBADM_BASE_DN}"
         )
         assert not response
 
@@ -534,7 +534,7 @@ def test_check_user_password() -> None:
     with pytest.raises(InvalidParams) as excinfo:
         # noinspection PyTypeChecker
         webadm_api_manager.check_user_password(
-            f"cn=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}", 1
+            f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}", 1
         )
         # NOSONAR
     assert (
@@ -557,25 +557,25 @@ def test_check_user_password() -> None:
     # Test with non existing DN object
     with pytest.raises(InternalError) as excinfo:
         webadm_api_manager.check_user_password(
-            f"cn={RANDOM_STRING},{WEBADM_BASE_DN}",
+            f"CN={RANDOM_STRING},{WEBADM_BASE_DN}",
             DEFAULT_PASSWORD,
         )
     assert (
         str(excinfo)
-        == f"<ExceptionInfo InternalError(\"LDAP object 'cn={RANDOM_STRING},{WEBADM_BASE_DN}' "
+        == f"<ExceptionInfo InternalError(\"LDAP object 'CN={RANDOM_STRING},{WEBADM_BASE_DN}' "
         f'does not exist") tblen=3>'
     )
 
     # Test with existing DN object, but a wrong password
     check_user_password_response = webadm_api_manager.check_user_password(
-        f"cn=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}",
+        f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}",
         "wrong password",
     )
     assert not check_user_password_response
 
     # Test with existing DN object, and the right password
     check_user_password_response = webadm_api_manager.check_user_password(
-        f"cn=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}",
+        f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}",
         DEFAULT_PASSWORD,
     )
     assert check_user_password_response
@@ -717,7 +717,7 @@ def test_set_user_data() -> None:
     Test Set_User_Data method.
     """
     response = webadm_api_manager.set_user_data(
-        f"cn=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}",
+        f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}",
         {
             "OpenOTP.EmergOTP": "4QrcOUm6Wau+VuBX8g+IPmZy2wOXWf+aAAA=",
             "SpanKey.PublicKey": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAq6UxOwHGPE0+O3bxOV64XNzmKPZTvW6O8zhxigi/3"
@@ -816,7 +816,7 @@ def test_set_user_attrs() -> None:
     with open(USER_CERT_PATH, "rb") as user_cert_file:
         user_cert = user_cert_file.read()
     response = webadm_api_manager.set_user_attrs(
-        f"cn=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}",
+        f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}",
         {
             "usercertificate": [
                 repr(user_cert.decode())
@@ -906,7 +906,7 @@ def test_get_event_logs() -> None:
 
     # Test to get event logs for a non existing DN
     response = webadm_api_manager.get_event_logs(
-        EventLogApplication.OPENOTP, max_=1, dn=f"cn={RANDOM_STRING},{WEBADM_BASE_DN}"
+        EventLogApplication.OPENOTP, max_=1, dn=f"CN={RANDOM_STRING},{WEBADM_BASE_DN}"
     )
     assert response == []
 
@@ -914,18 +914,18 @@ def test_get_event_logs() -> None:
     response = webadm_api_manager.get_event_logs(
         EventLogApplication.OPENOTP,
         max_=1,
-        dn=f"cn=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_4,{WEBADM_BASE_DN}",
+        dn=f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_4,{WEBADM_BASE_DN}",
     )
     assert response == []
 
     # Test to get only one event log for an existing DN with authentications
     if CLUSTER_TYPE == "mssp":
         user_w_auth = (
-            f"cn=u_cp_allowed,{WEBADM_BASE_DN.lower().replace('ou=pyrcdevs,', '')}"
+            f"CN=u_cp_allowed,{WEBADM_BASE_DN.lower().replace('ou=pyrcdevs,', '')}"
         )
     else:
         user_w_auth = (
-            f"cn=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_cp_allowed,{WEBADM_BASE_DN.lower().replace('ou=pyrcdevs,', '')}"
+            f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_cp_allowed,{WEBADM_BASE_DN.replace('OU=pyrcdevs,', '')}"
         )
 
     response = webadm_api_manager.get_event_logs(
