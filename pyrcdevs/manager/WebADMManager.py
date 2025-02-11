@@ -705,13 +705,13 @@ class WebADMManager(Manager):
 
     def search_inventory_items(
         self,
-        type_,
-        filter_=None,
-        linked=None,
-        active=None,
-        status=None,
-        start=None,
-        stop=None,
+        type_: str,
+        filter_: str = None,
+        linked: bool = None,
+        active: bool = None,
+        status: InventoryStatus = None,
+        start: str = None,
+        stop: str = None,
     ) -> list:
         """
         Return the Inventory items (list of serial numbers) correspondind to the search parameters.
@@ -721,8 +721,8 @@ class WebADMManager(Manager):
         :param bool linked: if linked us True, this only updates hardware token linked to a user.
         :param bool active: if active is True, hardware token is activated
         :param InventoryStatus status: status of hardware token (see InventoryStatus enum for possible statuses)
-        :param start:
-        :param stop:
+        :param str start: filter so that the import date is after the start time. Format for time is YYYY-MM-DD HH:MM:SS
+        :param str stop: filter so that the import date is after the stop time. Format for time is YYYY-MM-DD HH:MM:SS
         :return: list of found hardware token serial numbers
         :rtype: list
         """

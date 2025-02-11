@@ -1,3 +1,7 @@
+![PyPI - Python Version](https://img.shields.io/pypi/pyversions/pyrcdevs)
+![Read the Docs (version)](https://img.shields.io/readthedocs/pyrcdevs/v1.1.0) 
+
+
 # pyrcdevs
 ## Manager API
 ### Example (requesting Server_Status method)

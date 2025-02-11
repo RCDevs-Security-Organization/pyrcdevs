@@ -276,7 +276,7 @@ LIST_COUNTRY_NAMES = [
 ]
 LIST_STATUS_SERVERS_KEYS = ["ldap", "mail", "pki", "session", "sql"]
 LIST_STATUS_WEB_TYPES = {
-    "webapps": ["OpenID", "PwReset", "SelfDesk", "SelfReg"],
+    "webapps": ["HelpDesk", "OpenID", "PwReset", "SelfDesk", "SelfReg"],
     "websrvs": ["OpenOTP", "SMSHub", "SpanKey"],
 }
 
