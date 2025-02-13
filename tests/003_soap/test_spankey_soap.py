@@ -110,7 +110,7 @@ def test_nss_list() -> None:
         f"u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_pam": {
             "home": f"/home/u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_pam",
             "uid": "502",
-            "gid": "100",
+            "gid": "101",
             "shell": "/bin/bash",
         },
     }
@@ -138,7 +138,9 @@ def test_nss_list() -> None:
         },
         f"g_{CLUSTER_TYPE}_api_2": {
             "gid": "101",
-            "members": None,
+            "members": {
+                "xsd:string": f"u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_pam",
+            },
         },
     }
 
