@@ -1,32 +1,82 @@
 """This module implements tests for WebADM API Manager."""
 
+import base64
 import re
 
 import pytest
 
 import pyrcdevs
 from pyrcdevs import WebADMManager
-from pyrcdevs.constants import MSG_NOT_RIGHT_TYPE
+from pyrcdevs.constants import MSG_NOT_RIGHT_TYPE, REGEX_BASE64
 from pyrcdevs.manager import InternalError
 from pyrcdevs.manager.Manager import InvalidParams
-from pyrcdevs.manager.WebADMManager import (AutoConfirmApplication,
-                                            AutoConfirmExpiration,
-                                            ConfigObjectApplication,
-                                            ConfigObjectType,
-                                            EventLogApplication,
-                                            LicenseProduct)
-from tests.constants import (CLUSTER_TYPE, DEFAULT_PASSWORD, GROUP_OBJECTCLASS,
-                             LDAP_BASE_DN, LIST_STATUS_SERVERS_KEYS,
-                             LIST_STATUS_WEB_TYPES, OPENOTP_PUSHID,
-                             OPENOTP_TOKENKEY, RANDOM_STRING,
-                             REGEX_LOGTIME_TIME, REGEX_PARAMETER_DN_NOT_STRING,
-                             REGEX_VERSION_NUMBER, TESTER_NAME, USER_CERT_PATH,
-                             WEBADM_API_PASSWORD, WEBADM_API_USERNAME,
-                             WEBADM_BASE_DN, WEBADM_HOST)
+from pyrcdevs.manager.WebADMManager import (
+    AutoConfirmApplication,
+    AutoConfirmExpiration,
+    ConfigObjectApplication,
+    ConfigObjectType,
+    EventLogApplication,
+    LicenseProduct,
+)
+from tests.constants import (
+    CLUSTER_TYPE,
+    DEFAULT_PASSWORD,
+    GROUP_OBJECTCLASS,
+    LDAP_BASE_DN,
+    LIST_STATUS_SERVERS_KEYS,
+    LIST_STATUS_WEB_TYPES,
+    OPENOTP_PUSHID,
+    OPENOTP_TOKENKEY,
+    RANDOM_STRING,
+    REGEX_LOGTIME_TIME,
+    REGEX_PARAMETER_DN_NOT_STRING,
+    REGEX_VERSION_NUMBER,
+    TESTER_NAME,
+    USER_CERT_PATH,
+    WEBADM_API_PASSWORD,
+    WEBADM_API_USERNAME,
+    WEBADM_BASE_DN,
+    WEBADM_HOST,
+    LIST_USER_ACCOUNT_LDAP_AD,
+    LIST_USER_ACCOUNT_LDAP_SLAPD,
+    DICT_USER_OBJECTCLASS,
+)
 
 webadm_api_manager = WebADMManager(
     WEBADM_HOST, WEBADM_API_USERNAME, WEBADM_API_PASSWORD, 443, False
 )
+
+
+def _test_malformed_dns(method) -> None:
+    # Test with wrong DN type.
+    with pytest.raises(InvalidParams) as excinfo:
+        # noinspection PyTypeChecker
+        method(1)
+        # NOSONAR
+    assert str(excinfo) == REGEX_PARAMETER_DN_NOT_STRING
+
+    # Test to get user attribute of a non existing object
+    with pytest.raises(pyrcdevs.manager.Manager.InternalError) as excinfo:
+        method(f"CN=Not_exist_{RANDOM_STRING},{WEBADM_BASE_DN}")
+    assert (
+        str(excinfo)
+        == f"<ExceptionInfo InternalError(\"LDAP object 'CN=Not_exist_{RANDOM_STRING},o=root' does not exist\") "
+        f"tblen=3>"
+        or str(excinfo)
+        == f"<ExceptionInfo InternalError(\"LDAP object 'CN=Not_exist_{RANDOM_STRING},{WEBADM_BASE_DN}' "
+        'does not exist") tblen=3>'
+    )
+
+    with pytest.raises(pyrcdevs.manager.Manager.InternalError) as excinfo:
+        method(RANDOM_STRING)
+    assert (
+        str(excinfo)
+        == f"<ExceptionInfo InternalError(\"Could not read LDAP object '{RANDOM_STRING}' (invalid DN)\") tblen=3>"
+        or str(excinfo)
+        == f"<ExceptionInfo InternalError(\"Could not read LDAP object '{RANDOM_STRING}' (0000208F: "
+        f"NameErr: DSID-03100233, problem 2006 (BAD_NAME), data 8350, best match of:"
+        f"\\t'{RANDOM_STRING}')\") tblen=3>"
+    )
 
 
 def generate_user_attrs(
@@ -223,32 +273,8 @@ def test_activate_ldap_object() -> None:
     """
     Test Activate_LDAP_Object method.
     """
-    # Test to activate non existing object
-
-    with pytest.raises(pyrcdevs.manager.Manager.InternalError) as excinfo:
-        webadm_api_manager.activate_ldap_object(
-            f"CN=Not_exist_{RANDOM_STRING},{WEBADM_BASE_DN}"
-        )
-    assert (
-        str(excinfo)
-        == f"<ExceptionInfo InternalError(\"LDAP object 'CN=Not_exist_{RANDOM_STRING},o=root' does not exist\") "
-        f"tblen=3>"
-        or str(excinfo)
-        == f"<ExceptionInfo InternalError(\"LDAP object 'CN=Not_exist_{RANDOM_STRING},{WEBADM_BASE_DN}' "
-        'does not exist") tblen=3>'
-    )
-
-    # Test to activate providing a malformed DN
-    with pytest.raises(pyrcdevs.manager.Manager.InternalError) as excinfo:
-        webadm_api_manager.activate_ldap_object(RANDOM_STRING)
-    assert (
-        str(excinfo)
-        == f"<ExceptionInfo InternalError(\"Could not read LDAP object '{RANDOM_STRING}' (invalid DN)\") tblen=3>"
-        or str(excinfo)
-        == f"<ExceptionInfo InternalError(\"Could not read LDAP object '{RANDOM_STRING}' (0000208F: "
-        f"NameErr: DSID-03100233, problem 2006 (BAD_NAME), data 8350, best match of:"
-        f"\\t'{RANDOM_STRING}')\") tblen=3>"
-    )
+    # Test issue with DN parameter
+    _test_malformed_dns(webadm_api_manager.activate_ldap_object)
 
     # Test to activate existing account
     response = webadm_api_manager.activate_ldap_object(
@@ -312,32 +338,8 @@ def test_deactivate_ldap_object() -> None:
     """
     Test Deactivate_LDAP_Object method.
     """
-    # Test to deactivate non existing object
-
-    with pytest.raises(pyrcdevs.manager.Manager.InternalError) as excinfo:
-        webadm_api_manager.deactivate_ldap_object(
-            f"CN=Not_exist_{RANDOM_STRING},{WEBADM_BASE_DN}"
-        )
-    assert (
-        str(excinfo)
-        == f"<ExceptionInfo InternalError(\"LDAP object 'CN=Not_exist_{RANDOM_STRING},o=root' does not exist\") "
-        f"tblen=3>"
-        or str(excinfo)
-        == f"<ExceptionInfo InternalError(\"LDAP object 'CN=Not_exist_{RANDOM_STRING},{WEBADM_BASE_DN}' "
-        f'does not exist") tblen=3>'
-    )
-
-    # Test to deactivate providing a malformed DN
-    with pytest.raises(pyrcdevs.manager.Manager.InternalError) as excinfo:
-        webadm_api_manager.deactivate_ldap_object(RANDOM_STRING)
-    assert (
-        str(excinfo)
-        == f"<ExceptionInfo InternalError(\"Could not read LDAP object '{RANDOM_STRING}' (invalid DN)\") tblen=3>"
-        or str(excinfo)
-        == f"<ExceptionInfo InternalError(\"Could not read LDAP object '{RANDOM_STRING}' (0000208F: "
-        "NameErr: DSID-03100233, problem 2006 (BAD_NAME), data 8350, best match of"
-        f":\\t'{RANDOM_STRING}')\") tblen=3>"
-    )
+    # Test issue with DN parameter
+    _test_malformed_dns(webadm_api_manager.deactivate_ldap_object)
 
     # Test to deactivate an activated account
     response = webadm_api_manager.deactivate_ldap_object(
@@ -924,9 +926,7 @@ def test_get_event_logs() -> None:
             f"CN=u_cp_allowed,{WEBADM_BASE_DN.lower().replace('ou=pyrcdevs,', '')}"
         )
     else:
-        user_w_auth = (
-            f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_cp_allowed,{WEBADM_BASE_DN.replace('OU=pyrcdevs,', '')}"
-        )
+        user_w_auth = f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_cp_allowed,{WEBADM_BASE_DN.replace('OU=pyrcdevs,', '')}"
 
     response = webadm_api_manager.get_event_logs(
         EventLogApplication.OPENOTP,
@@ -965,3 +965,268 @@ def test_get_event_logs() -> None:
             for prefix in ("client", "dn", "host", "session", "source", "text", "time")
         )
         assert re.compile(REGEX_LOGTIME_TIME).search(log["time"])
+
+
+def test_get_license_details() -> None:
+    """
+    Test Get_License_Details method.
+    """
+    # Test to get license details using wrong type for product parameter
+    with pytest.raises(TypeError) as excinfo:
+        # noinspection PyTypeChecker
+        webadm_api_manager.get_license_details("openotp")
+    assert (
+        str(excinfo)
+        == f"<ExceptionInfo TypeError('{MSG_NOT_RIGHT_TYPE.format('product', 'LicenseProduct')}') tblen=2>"
+    )
+
+    # Test to get license details for all products
+    response = webadm_api_manager.get_license_details()
+    assert isinstance(response, dict)
+
+    assert all(
+        key
+        in (
+            "type",
+            "token_pool",
+            "cache_time",
+            "customer_id",
+            "instance_id",
+            "valid_from",
+            "valid_to",
+            "products",
+            "error_message",
+        )
+        for key in response
+    )
+
+    assert response["type"] == "Subscription"
+    assert re.compile(r"2/\d*").search(response["token_pool"])
+    assert isinstance(response["cache_time"], int)
+    assert re.compile(r"[0-9A-Z]*").search(response["customer_id"])
+    assert re.compile(r"\d*").search(response["instance_id"])
+    assert re.compile(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}").search(
+        response["valid_from"]
+    )
+    assert re.compile(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}").search(
+        response["valid_to"]
+    )
+    assert response["error_message"] is None
+
+    assert isinstance(response["products"], dict)
+    products = response["products"]
+
+    assert all(key in ("OpenOTP", "SpanKey") for key in products)
+
+    assert isinstance(products["OpenOTP"], dict)
+    assert all(
+        key in ("maximum_users", "allowed_options") for key in products["OpenOTP"]
+    )
+    assert re.compile(r"\d*").search(products["OpenOTP"]["maximum_users"])
+    assert all(
+        value in ["AUTH", "SIGN", "VOICE", "BADGE"]
+        for value in products["OpenOTP"]["allowed_options"]
+    )
+
+    assert isinstance(products["SpanKey"], dict)
+    assert all(key in "maximum_hosts" for key in products["SpanKey"])
+    assert re.compile(r"\d*").search(products["SpanKey"]["maximum_hosts"])
+
+    # Test to get license details for OpenOTP product
+    response = webadm_api_manager.get_license_details(LicenseProduct.OPENOTP)
+    assert isinstance(response, dict)
+
+    assert all(
+        key
+        in (
+            "type",
+            "token_pool",
+            "cache_time",
+            "customer_id",
+            "instance_id",
+            "valid_from",
+            "valid_to",
+            "maximum_users",
+            "allowed_options",
+            "error_message",
+        )
+        for key in response
+    )
+
+    assert response["type"] == "Subscription"
+    assert re.compile(r"2/\d*").search(response["token_pool"])
+    assert isinstance(response["cache_time"], int)
+    assert re.compile(r"[0-9A-Z]*").search(response["customer_id"])
+    assert re.compile(r"\d*").search(response["instance_id"])
+    assert re.compile(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}").search(
+        response["valid_from"]
+    )
+    assert re.compile(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}").search(
+        response["valid_to"]
+    )
+    assert response["error_message"] is None
+
+    assert re.compile(r"\d*").search(response["maximum_users"])
+    assert all(
+        value in ["AUTH", "SIGN", "VOICE", "BADGE"]
+        for value in response["allowed_options"]
+    )
+
+    # Test to get license details for SpanKey product
+    response = webadm_api_manager.get_license_details(LicenseProduct.SPANKEY)
+    assert isinstance(response, dict)
+
+    assert all(
+        key
+        in (
+            "type",
+            "token_pool",
+            "cache_time",
+            "customer_id",
+            "instance_id",
+            "valid_from",
+            "valid_to",
+            "maximum_hosts",
+            "error_message",
+        )
+        for key in response
+    )
+
+    assert response["type"] == "Subscription"
+    assert re.compile(r"2/\d*").search(response["token_pool"])
+    assert isinstance(response["cache_time"], int)
+    assert re.compile(r"[0-9A-Z]*").search(response["customer_id"])
+    assert re.compile(r"\d*").search(response["instance_id"])
+    assert re.compile(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}").search(
+        response["valid_from"]
+    )
+    assert re.compile(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}").search(
+        response["valid_to"]
+    )
+    assert response["error_message"] is None
+
+    assert re.compile(r"\d*").search(response["maximum_hosts"])
+
+
+def test_get_random_bytes() -> None:
+    """
+    Test Get_Random_Bytes method.
+    """
+    # Test for non positive integer
+    with pytest.raises(pyrcdevs.manager.Manager.InvalidParams) as excinfo:
+        webadm_api_manager.get_random_bytes(-1)
+    assert (
+        str(excinfo)
+        == f"<ExceptionInfo InvalidParams('Parameter length not Integer') tblen=3>"
+    )
+
+    # Test that different returned random bytes have expected length
+    for length in [1, 10, 100, 1000, 10000]:
+        response = webadm_api_manager.get_random_bytes(length)
+        assert re.compile(REGEX_BASE64).search(response)
+        assert len(base64.b64decode(response)) == length
+
+
+def test_get_user_attrs() -> None:
+    """
+    Test Get_User_Attrs method.
+    """
+    # Test issue with DN parameter
+    _test_malformed_dns(webadm_api_manager.get_user_attrs)
+
+    response = webadm_api_manager.get_user_attrs(
+        f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}"
+    )
+
+    assert all(
+        (
+            key in LIST_USER_ACCOUNT_LDAP_SLAPD
+            if CLUSTER_TYPE == "mssp"
+            else LIST_USER_ACCOUNT_LDAP_AD
+        )
+        for key in response
+    )
+    assert response["objectclass"] == DICT_USER_OBJECTCLASS[CLUSTER_TYPE]
+    assert all(
+        response[key] == [f"u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1"]
+        for key in ["cn", "sn", "uid"]
+        + (["samaccountname", "name"] if CLUSTER_TYPE in ("normal", "metadata") else [])
+    )
+    assert response["homedirectory"] == [
+        f"/home/u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1"
+    ]
+    assert response["loginshell"] == ["/bin/bash"]
+    if CLUSTER_TYPE == "normal":
+        assert (
+            isinstance(response["webadmdata"], list)
+            and len(response["webadmdata"]) == 1
+            and isinstance(response["webadmdata"][0], str)
+        )
+        data = response["webadmdata"][0].split(",")
+        assert isinstance(data, list) and len(data) > 0
+        assert all(
+            re.compile(
+                rf".*=({{wcrypt}})*{REGEX_BASE64.replace('$', '').replace('^', '')}"
+            ).search(d)
+            for d in data
+        )
+    assert all(
+        isinstance(response[key], list)
+        and len(response[key]) == 1
+        and re.compile(r"\d*(.0Z)*").search(response[key][0])
+        for key in (
+            [
+                "instancetype",
+                "usncreated",
+                "usnchanged",
+                "useraccountcontrol",
+                "badpwdcount",
+                "codepage",
+                "countrycode",
+                "lastlogoff",
+                "pwdlastset",
+                "primarygroupid",
+                "accountexpires",
+                "logoncount",
+                "samaccounttype",
+                "lastlogontimestamp",
+                "whencreated",
+                "whenchanged",
+                "dscorepropagationdata",
+            ]
+            if CLUSTER_TYPE in ("normal", "metadata")
+            else [
+                "uidnumber",
+                "gidnumber",
+            ]
+        )
+    )
+    assert (
+        isinstance(response["usercertificate"], list)
+        and len(response["usercertificate"]) > 0
+    )
+    assert all(
+        re.compile(REGEX_BASE64).search(certificate)
+        for certificate in response["usercertificate"]
+    )
+
+    # Test for non existing attribute
+    response = webadm_api_manager.get_user_attrs(
+        f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}",
+        ["nonexistingattribute"],
+    )
+    assert response == []
+
+    # Test for uidnumber and gidnumber
+    response = webadm_api_manager.get_user_attrs(
+        f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}",
+        ["uidnumber", "gidnumber"],
+    )
+    assert response == {
+        "gidnumber": [
+            "100",
+        ],
+        "uidnumber": [
+            "500",
+        ],
+    }

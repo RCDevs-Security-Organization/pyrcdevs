@@ -14,6 +14,32 @@ CLUSTER_TYPE = os.environ["CLUSTER_TYPE"]
 
 DEFAULT_PASSWORD = os.environ["DEFAULT_PASSWORD"]
 
+DICT_USER_OBJECTCLASS = {
+    "normal": [
+        "top",
+        "webadmaccount",
+        "posixaccount",
+        "person",
+        "organizationalperson",
+        "user",
+        "inetorgperson",
+    ],
+    "metadata": [
+        "top",
+        "posixaccount",
+        "person",
+        "organizationalperson",
+        "user",
+        "inetorgperson",
+    ],
+    "mssp": [
+        "person",
+        "inetorgperson",
+        "posixaccount",
+        "webadmaccount",
+    ],
+}
+
 EXCEPTION_NOT_RIGHT_TYPE = "<ExceptionInfo TypeError('{} parameter is not {}') tblen=2>"
 
 GROUP_OBJECTCLASS = os.environ["GROUP_OBJECTCLASS"]
@@ -279,6 +305,56 @@ LIST_STATUS_WEB_TYPES = {
     "webapps": ["HelpDesk", "OpenID", "PwReset", "SelfDesk", "SelfReg"],
     "websrvs": ["OpenOTP", "SMSHub", "SpanKey"],
 }
+LIST_USER_ACCOUNT_LDAP_AD = (
+    "objectclass",
+    "cn",
+    "sn",
+    "usercertificate",
+    "distinguishedname",
+    "instancetype",
+    "whencreated",
+    "whenchanged",
+    "usncreated",
+    "usnchanged",
+    "name",
+    "objectguid",
+    "useraccountcontrol",
+    "badpwdcount",
+    "codepage",
+    "countrycode",
+    "homedirectory",
+    "badpasswordtime",
+    "lastlogoff",
+    "lastlogon",
+    "pwdlastset",
+    "primarygroupid",
+    "objectsid",
+    "accountexpires",
+    "logoncount",
+    "samaccountname",
+    "samaccounttype",
+    "objectcategory",
+    "dscorepropagationdata",
+    "lastlogontimestamp",
+    "uid",
+    "uidnumber",
+    "gidnumber",
+    "loginshell",
+    "webadmdata",
+)
+LIST_USER_ACCOUNT_LDAP_SLAPD = (
+    "objectclass",
+    "sn",
+    "cn",
+    "uid",
+    "uidnumber",
+    "gidnumber",
+    "homedirectory",
+    "loginshell",
+    "userpassword",
+    "webadmdata",
+    "usercertificate",
+)
 
 MSG_AUTH_SUCCESS = "Authentication success"
 MSG_ENTER_EMERGENCY_OTP = "Enter your EMERGENCY password"
