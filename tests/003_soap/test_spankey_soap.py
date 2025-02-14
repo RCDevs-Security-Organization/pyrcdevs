@@ -94,6 +94,7 @@ def test_nss_list() -> None:
     assert response["code"] == "1"
     assert response["error"] is None
     assert response["message"] == MSG_OPERATION_SUCCESS
+    pam_username = f"u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_pam" if CLUSTER_TYPE != "mssp" else f"u_pam"
     assert response["data"] == {
         f"u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1": {
             "gid": "100",  # NOSONAR
@@ -107,8 +108,8 @@ def test_nss_list() -> None:
             "shell": "/bin/bash",
             "uid": "501",
         },
-        f"u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_pam": {
-            "home": f"/home/u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_pam",
+        pam_username: {
+            "home": f"/home/{pam_username}",
             "uid": "502",
             "gid": "101",
             "shell": "/bin/bash",
@@ -139,7 +140,7 @@ def test_nss_list() -> None:
         f"g_{CLUSTER_TYPE}_api_2": {
             "gid": "101",
             "members": {
-                "xsd:string": f"u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_pam",
+                "xsd:string": pam_username,
             },
         },
     }

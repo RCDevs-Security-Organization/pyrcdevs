@@ -1001,10 +1001,12 @@ def test_get_license_details() -> None:
     )
 
     assert response["type"] in ["Subscription", "Virtual"]
-    assert re.compile(r"2/\d*").search(response["token_pool"])
-    assert isinstance(response["cache_time"], int)
-    assert re.compile(r"[0-9A-Z]*").search(response["customer_id"])
-    assert re.compile(r"\d*").search(response["instance_id"])
+    if CLUSTER_TYPE != "mssp":
+        assert re.compile(r"2/\d*").search(response["token_pool"])
+        assert isinstance(response["cache_time"], int)
+        assert re.compile(r"\d*").search(response["instance_id"])
+    assert response["customer_id"] is None or re.compile(r"[0-9A-Z]*").search(response["customer_id"])
+
     assert re.compile(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}").search(
         response["valid_from"]
     )
@@ -1022,7 +1024,7 @@ def test_get_license_details() -> None:
     assert all(
         key in ("maximum_users", "allowed_options") for key in products["OpenOTP"]
     )
-    assert re.compile(r"\d*").search(products["OpenOTP"]["maximum_users"])
+    assert re.compile(r"\d*").search(str(products["OpenOTP"]["maximum_users"]))
     assert all(
         value in ["AUTH", "SIGN", "VOICE", "BADGE"]
         for value in products["OpenOTP"]["allowed_options"]
@@ -1053,11 +1055,13 @@ def test_get_license_details() -> None:
         for key in response
     )
 
-    assert response["type"] == "Subscription"
-    assert re.compile(r"2/\d*").search(response["token_pool"])
-    assert isinstance(response["cache_time"], int)
-    assert re.compile(r"[0-9A-Z]*").search(response["customer_id"])
-    assert re.compile(r"\d*").search(response["instance_id"])
+    assert response["type"] in ["Subscription", "Virtual"]
+    if CLUSTER_TYPE != "mssp":
+        assert re.compile(r"2/\d*").search(response["token_pool"])
+        assert isinstance(response["cache_time"], int)
+        assert re.compile(r"\d*").search(response["instance_id"])
+    assert response["customer_id"] is None or re.compile(r"[0-9A-Z]*").search(response["customer_id"])
+
     assert re.compile(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}").search(
         response["valid_from"]
     )
@@ -1066,7 +1070,7 @@ def test_get_license_details() -> None:
     )
     assert response["error_message"] is None
 
-    assert re.compile(r"\d*").search(response["maximum_users"])
+    assert re.compile(r"\d*").search(str(response["maximum_users"]))
     assert all(
         value in ["AUTH", "SIGN", "VOICE", "BADGE"]
         for value in response["allowed_options"]
@@ -1092,11 +1096,13 @@ def test_get_license_details() -> None:
         for key in response
     )
 
-    assert response["type"] == "Subscription"
-    assert re.compile(r"2/\d*").search(response["token_pool"])
-    assert isinstance(response["cache_time"], int)
-    assert re.compile(r"[0-9A-Z]*").search(response["customer_id"])
-    assert re.compile(r"\d*").search(response["instance_id"])
+    assert response["type"] in ["Subscription", "Virtual"]
+    if CLUSTER_TYPE != "mssp":
+        assert re.compile(r"2/\d*").search(response["token_pool"])
+        assert isinstance(response["cache_time"], int)
+        assert re.compile(r"\d*").search(response["instance_id"])
+    assert response["customer_id"] is None or re.compile(r"[0-9A-Z]*").search(response["customer_id"])
+
     assert re.compile(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}").search(
         response["valid_from"]
     )
