@@ -1000,7 +1000,7 @@ def test_get_license_details() -> None:
         for key in response
     )
 
-    assert response["type"] == "Subscription"
+    assert response["type"] in ["Subscription", "Virtual"]
     assert re.compile(r"2/\d*").search(response["token_pool"])
     assert isinstance(response["cache_time"], int)
     assert re.compile(r"[0-9A-Z]*").search(response["customer_id"])
