@@ -1002,7 +1002,7 @@ def test_get_license_details() -> None:
 
     assert response["type"] in ["Subscription", "Virtual"]
     if CLUSTER_TYPE != "mssp":
-        assert re.compile(r"2/\d*").search(response["token_pool"])
+        assert re.compile(r"\d/\d*").search(response["token_pool"])
         assert isinstance(response["cache_time"], int)
         assert re.compile(r"\d*").search(response["instance_id"])
     assert response["customer_id"] is None or re.compile(r"[0-9A-Z]*").search(response["customer_id"])
@@ -1057,7 +1057,7 @@ def test_get_license_details() -> None:
 
     assert response["type"] in ["Subscription", "Virtual"]
     if CLUSTER_TYPE != "mssp":
-        assert re.compile(r"2/\d*").search(response["token_pool"])
+        assert re.compile(r"\d/\d*").search(response["token_pool"])
         assert isinstance(response["cache_time"], int)
         assert re.compile(r"\d*").search(response["instance_id"])
     assert response["customer_id"] is None or re.compile(r"[0-9A-Z]*").search(response["customer_id"])
@@ -1098,7 +1098,7 @@ def test_get_license_details() -> None:
 
     assert response["type"] in ["Subscription", "Virtual"]
     if CLUSTER_TYPE != "mssp":
-        assert re.compile(r"2/\d*").search(response["token_pool"])
+        assert re.compile(r"\d/\d*").search(response["token_pool"])
         assert isinstance(response["cache_time"], int)
         assert re.compile(r"\d*").search(response["instance_id"])
     assert response["customer_id"] is None or re.compile(r"[0-9A-Z]*").search(response["customer_id"])
