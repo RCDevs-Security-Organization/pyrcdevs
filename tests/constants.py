@@ -423,7 +423,8 @@ REGEX_FAILED_TO_RESOLVE = (
     r"HTTPSConnectionPool\(host='wrong_host', port=[0-9]*\): Max retries exceeded with url: /[^/]*/"
     r" \(Caused by NameResolutionError\(\"<urllib3.connection.HTTPSConnection object at "
     r"0x[0-9a-f]{12}>: Failed to resolve 'wrong_host' "
-    r"\(\[Errno -2\] Name or service not known\)\"\)\)"
+    r"\(\[Errno -[0-9]+\] (Name or service not known|Temporary failure in name resolution|"
+    r"No address associated with hostname)\)\"\)\)"
 )
 REGEX_IPV4 = (
     r"^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25["
