@@ -516,7 +516,7 @@ def test_check_user_active() -> None:
 
         # Test with existing unactivated user object (unactivated)
         response = webadm_api_manager.check_user_active(
-            f"CN=u_{CLUSTER_TYPE}_unact,{WEBADM_BASE_DN}"
+            f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_unact,{WEBADM_BASE_DN}"
         )
         assert not response
 
