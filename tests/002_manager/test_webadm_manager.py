@@ -245,25 +245,25 @@ def test_create_ldap_object() -> None:
     )
 
     # Test creating unactivated object
-    user_attributes = generate_user_attrs(f"u_{CLUSTER_TYPE}_unact")
+    user_attributes = generate_user_attrs(f"u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_unact")
     response = webadm_api_manager.create_ldap_object(
-        f"CN=u_{CLUSTER_TYPE}_unact,{WEBADM_BASE_DN}",
+        f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_unact,{WEBADM_BASE_DN}",
         user_attributes,
     )
     assert response
 
     # Test creating testgroup1 object
-    group_attributes = generate_group_attrs(f"g_{CLUSTER_TYPE}_api_1", 100)
+    group_attributes = generate_group_attrs(f"g_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1", 100)
     response = webadm_api_manager.create_ldap_object(
-        f"CN=g_{CLUSTER_TYPE}_api_1,{WEBADM_BASE_DN}",
+        f"CN=g_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}",
         group_attributes,
     )
     assert response
 
     # Test creating testgroup2 object
-    group_attributes = generate_group_attrs(f"g_{CLUSTER_TYPE}_api_2", 101)
+    group_attributes = generate_group_attrs(f"g_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_2", 101)
     response = webadm_api_manager.create_ldap_object(
-        f"CN=g_{CLUSTER_TYPE}_api_2,{WEBADM_BASE_DN}",
+        f"CN=g_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_2,{WEBADM_BASE_DN}",
         group_attributes,
     )
     assert response
@@ -311,7 +311,7 @@ def test_activate_ldap_object() -> None:
 
     # Test to activate existing group
     response = webadm_api_manager.activate_ldap_object(
-        f"CN=g_{CLUSTER_TYPE}_api_1,{WEBADM_BASE_DN}"
+        f"CN=g_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}"
     )
     if "metadata" in WEBADM_HOST:
         assert not response
@@ -320,7 +320,7 @@ def test_activate_ldap_object() -> None:
 
     # Test to activate existing group
     response = webadm_api_manager.activate_ldap_object(
-        f"CN=g_{CLUSTER_TYPE}_api_2,{WEBADM_BASE_DN}"
+        f"CN=g_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_2,{WEBADM_BASE_DN}"
     )
     if "metadata" in WEBADM_HOST:
         assert not response
@@ -329,7 +329,7 @@ def test_activate_ldap_object() -> None:
 
     # Test to activate existing group already activated
     response = webadm_api_manager.activate_ldap_object(
-        f"CN=g_{CLUSTER_TYPE}_api_1,{WEBADM_BASE_DN}"
+        f"CN=g_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}"
     )
     assert not response
 

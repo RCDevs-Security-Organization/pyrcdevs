@@ -128,7 +128,7 @@ def test_nss_list() -> None:
     assert response["error"] is None
     assert response["message"] == MSG_OPERATION_SUCCESS
     assert response["data"] == {
-        f"g_{CLUSTER_TYPE}_api_1": {
+        f"g_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1": {
             "gid": "100",
             "members": {
                 "xsd:string": [
@@ -137,7 +137,7 @@ def test_nss_list() -> None:
                 ]
             },
         },
-        f"g_{CLUSTER_TYPE}_api_2": {
+        f"g_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_2": {
             "gid": "101",
             "members": {
                 "xsd:string": pam_username,
@@ -266,7 +266,7 @@ def test_nss_info() -> None:
     # Test with existing group
     response = spankey_soap_api.nss_info(
         NSSDatabaseType.GROUP,
-        name=f"g_{CLUSTER_TYPE}_api_1",
+        name=f"g_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1",
         client=RANDOM_STRING,
         source="127.0.0.1",
         domain="Default",
@@ -276,7 +276,7 @@ def test_nss_info() -> None:
     assert response["error"] is None
     assert response["message"] == MSG_OPERATION_SUCCESS
     assert response["data"] == {
-        f"g_{CLUSTER_TYPE}_api_1": {
+        f"g_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1": {
             "members": {
                 "xsd:string": [
                     f"u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1",
