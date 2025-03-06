@@ -2,8 +2,10 @@
 
 import base64
 import re
+from http.client import responses
 
 import pytest
+from cffi.model import unknown_type
 
 import pyrcdevs
 from pyrcdevs import WebADMManager
@@ -47,17 +49,23 @@ webadm_api_manager = WebADMManager(
 )
 
 
-def _test_malformed_dns(method) -> None:
+def _test_malformed_dns(method, *args) -> None:
     # Test with wrong DN type.
     with pytest.raises(InvalidParams) as excinfo:
         # noinspection PyTypeChecker
-        method(1)
+        if args:
+            method(1, *args)
+        else:
+            method(1)
         # NOSONAR
     assert str(excinfo) == REGEX_PARAMETER_DN_NOT_STRING
 
     # Test to get user attribute of a non existing object
     with pytest.raises(pyrcdevs.manager.Manager.InternalError) as excinfo:
-        method(f"CN=Not_exist_{RANDOM_STRING},{WEBADM_BASE_DN}")
+        if args:
+            method(f"CN=Not_exist_{RANDOM_STRING},{WEBADM_BASE_DN}", *args)
+        else:
+            method(f"CN=Not_exist_{RANDOM_STRING},{WEBADM_BASE_DN}")
     assert (
         str(excinfo)
         == f"<ExceptionInfo InternalError(\"LDAP object 'CN=Not_exist_{RANDOM_STRING},o=root' does not exist\") "
@@ -68,7 +76,10 @@ def _test_malformed_dns(method) -> None:
     )
 
     with pytest.raises(pyrcdevs.manager.Manager.InternalError) as excinfo:
-        method(RANDOM_STRING)
+        if args:
+            method(RANDOM_STRING, *args)
+        else:
+            method(RANDOM_STRING)
     assert (
         str(excinfo)
         == f"<ExceptionInfo InternalError(\"Could not read LDAP object '{RANDOM_STRING}' (invalid DN)\") tblen=3>"
@@ -245,7 +256,9 @@ def test_create_ldap_object() -> None:
     )
 
     # Test creating unactivated object
-    user_attributes = generate_user_attrs(f"u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_unact")
+    user_attributes = generate_user_attrs(
+        f"u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_unact"
+    )
     response = webadm_api_manager.create_ldap_object(
         f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_unact,{WEBADM_BASE_DN}",
         user_attributes,
@@ -253,7 +266,9 @@ def test_create_ldap_object() -> None:
     assert response
 
     # Test creating testgroup1 object
-    group_attributes = generate_group_attrs(f"g_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1", 100)
+    group_attributes = generate_group_attrs(
+        f"g_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1", 100
+    )
     response = webadm_api_manager.create_ldap_object(
         f"CN=g_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}",
         group_attributes,
@@ -261,7 +276,9 @@ def test_create_ldap_object() -> None:
     assert response
 
     # Test creating testgroup2 object
-    group_attributes = generate_group_attrs(f"g_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_2", 101)
+    group_attributes = generate_group_attrs(
+        f"g_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_2", 101
+    )
     response = webadm_api_manager.create_ldap_object(
         f"CN=g_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_2,{WEBADM_BASE_DN}",
         group_attributes,
@@ -1005,7 +1022,9 @@ def test_get_license_details() -> None:
         assert re.compile(r"\d/\d*").search(response["token_pool"])
         assert isinstance(response["cache_time"], int)
         assert re.compile(r"\d*").search(response["instance_id"])
-    assert response["customer_id"] is None or re.compile(r"[0-9A-Z]*").search(response["customer_id"])
+    assert response["customer_id"] is None or re.compile(r"[0-9A-Z]*").search(
+        response["customer_id"]
+    )
 
     assert re.compile(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}").search(
         response["valid_from"]
@@ -1060,7 +1079,9 @@ def test_get_license_details() -> None:
         assert re.compile(r"\d/\d*").search(response["token_pool"])
         assert isinstance(response["cache_time"], int)
         assert re.compile(r"\d*").search(response["instance_id"])
-    assert response["customer_id"] is None or re.compile(r"[0-9A-Z]*").search(response["customer_id"])
+    assert response["customer_id"] is None or re.compile(r"[0-9A-Z]*").search(
+        response["customer_id"]
+    )
 
     assert re.compile(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}").search(
         response["valid_from"]
@@ -1101,7 +1122,9 @@ def test_get_license_details() -> None:
         assert re.compile(r"\d/\d*").search(response["token_pool"])
         assert isinstance(response["cache_time"], int)
         assert re.compile(r"\d*").search(response["instance_id"])
-    assert response["customer_id"] is None or re.compile(r"[0-9A-Z]*").search(response["customer_id"])
+    assert response["customer_id"] is None or re.compile(r"[0-9A-Z]*").search(
+        response["customer_id"]
+    )
 
     assert re.compile(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}").search(
         response["valid_from"]
@@ -1236,3 +1259,149 @@ def test_get_user_attrs() -> None:
             "500",
         ],
     }
+
+
+def test_get_user_dn() -> None:
+    """
+    Test Get_User_DN method.
+    """
+    # Test with unknown domain
+    with pytest.raises(pyrcdevs.manager.Manager.InternalError) as excinfo:
+        webadm_api_manager.get_user_dn(RANDOM_STRING, RANDOM_STRING)
+    assert (
+        str(excinfo)
+        == f"<ExceptionInfo InternalError(\"Domain '{RANDOM_STRING}' not existing\") tblen=3>"
+    )
+
+    # Test with unknown user
+    with pytest.raises(pyrcdevs.manager.Manager.InternalError) as excinfo:
+        webadm_api_manager.get_user_dn(RANDOM_STRING, "Domain_Enabled")
+    exception_str = str(excinfo)
+    assert (
+        exception_str
+        == "<ExceptionInfo InternalError('User not found Domain_Enabled\\\\"
+        + rf"{RANDOM_STRING}') tblen=3>"
+    )
+
+    # Test existing user
+    response = webadm_api_manager.get_user_dn(
+        f"u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1", "Domain_Enabled"
+    )
+    assert (
+        response.lower()
+        == f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}".lower()
+    )
+
+
+def test_get_user_domains() -> None:
+    """
+    Test Get_User_Domains method.
+    """
+    # Test issue with DN parameter
+    _test_malformed_dns(webadm_api_manager.get_user_domains)
+
+    # Test existing user
+    response = webadm_api_manager.get_user_domains(
+        f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}".lower()
+    )
+    assert isinstance(response, list)
+    assert len(response) > 0
+
+
+def test_get_user_groups() -> None:
+    """
+    Test Get_User_Groups method.
+    """
+    # Test issue with DN parameter
+    _test_malformed_dns(webadm_api_manager.get_user_groups, "Domain_Enabled")
+
+    # Test with unknown domain
+    with pytest.raises(pyrcdevs.manager.Manager.InternalError) as excinfo:
+        webadm_api_manager.get_user_groups(
+            f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}".lower(),
+            RANDOM_STRING,
+        )
+    assert (
+        str(excinfo)
+        == f"<ExceptionInfo InternalError(\"Domain '{RANDOM_STRING}' not existing\") tblen=3>"
+    )
+
+    # Test with unknown user
+    unknown_user_dn = f"cn={RANDOM_STRING},{WEBADM_BASE_DN}".lower()
+    with pytest.raises(pyrcdevs.manager.Manager.InternalError) as excinfo:
+        webadm_api_manager.get_user_groups(unknown_user_dn, "Domain_Enabled")
+    exception_str = str(excinfo)
+    assert (
+        exception_str
+        == f"<ExceptionInfo InternalError(\"LDAP object '{unknown_user_dn}' does not exist\") tblen=3>"
+    )
+
+    response = webadm_api_manager.get_user_groups(
+        f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}".lower(),
+        "Domain_Enabled",
+    )
+    assert isinstance(response, list)
+    list_groups_lower = [g.lower() for g in response]
+    assert list_groups_lower == [
+        f"CN=g_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}".lower()
+    ]
+
+
+def test_get_user_data() -> None:
+    """
+    Test Get_User_Data method.
+    """
+    # Test issue with DN parameter
+    _test_malformed_dns(webadm_api_manager.get_user_data)
+
+    # Test with unknown user
+    unknown_user_dn = f"cn={RANDOM_STRING},{WEBADM_BASE_DN}".lower()
+    with pytest.raises(pyrcdevs.manager.Manager.InternalError) as excinfo:
+        webadm_api_manager.get_user_data(unknown_user_dn)
+    exception_str = str(excinfo)
+    assert (
+        exception_str
+        == f"<ExceptionInfo InternalError(\"LDAP object '{unknown_user_dn}' does not exist\") tblen=3>"
+    )
+
+    # Test for all existing data
+    response = webadm_api_manager.get_user_data(
+        f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}".lower(),
+    )
+    assert isinstance(response, dict)
+    list_keys = list(response.keys())
+    list_keys.sort()
+    assert list_keys == [
+        "OpenOTP.EmergOTP",
+        "OpenOTP.TokenID",
+        "OpenOTP.TokenKey",
+        "OpenOTP.TokenModel",
+        "OpenOTP.TokenSerial",
+        "OpenOTP.TokenState",
+        "OpenOTP.TokenType",
+        "SpanKey.KeyType",
+        "SpanKey.PublicKey",
+    ]
+
+    # Test for non existing data
+    response = webadm_api_manager.get_user_data(
+        f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}".lower(),
+        [f"{RANDOM_STRING}.{RANDOM_STRING}"],
+    )
+    assert response == []
+
+    # Test for 2 existing data
+    response = webadm_api_manager.get_user_data(
+        f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}".lower(),
+        [
+            "OpenOTP.EmergOTP",
+            "OpenOTP.TokenID",
+        ],
+    )
+    assert isinstance(response, dict)
+    list_keys = list(response.keys())
+    list_keys.sort()
+    assert list_keys == [
+        "OpenOTP.EmergOTP",
+        "OpenOTP.TokenID",
+    ]
