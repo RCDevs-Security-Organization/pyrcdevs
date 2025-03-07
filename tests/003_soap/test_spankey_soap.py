@@ -1,5 +1,5 @@
 """This module implements tests for SpanKey SOAP API."""
-
+import json
 import re
 import time
 
@@ -35,7 +35,6 @@ spankey_soap_api = SpanKeySoap(
     False,
     api_key=SPANKEY_API_KEY,
 )
-
 
 def test_status() -> None:
     """
@@ -86,6 +85,11 @@ def test_nss_list() -> None:
     assert response["message"] == MSG_SERVER_ERROR
     assert response["data"] == {}
 
+    # Loading uidnumbers from disk
+    with open('/tmp/uidnumbers.json') as f:
+        uidnumbers_data = f.read()
+    uid_numbers = json.loads(uidnumbers_data)
+
     # Test for users
     response = spankey_soap_api.nss_list(
         NSSDatabaseType.USER, client=RANDOM_STRING, source="127.0.0.1", domain="Default"
@@ -100,13 +104,13 @@ def test_nss_list() -> None:
             "gid": "100",  # NOSONAR
             "home": f"/home/u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1",
             "shell": "/bin/bash",  # NOSONAR
-            "uid": "500",
+            "uid": str(uid_numbers[f"u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1"]),
         },
         f"u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_2": {
             "gid": "100",
             "home": f"/home/u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_2",
             "shell": "/bin/bash",
-            "uid": "501",
+            "uid": str(uid_numbers[f"u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_2"]),
         },
         pam_username: {
             "home": f"/home/{pam_username}",
@@ -242,6 +246,11 @@ def test_nss_info() -> None:
     assert response["message"] == MSG_INVALID_REQUEST
     assert response["data"] is None
 
+    # Loading uidnumbers from disk
+    with open('/tmp/uidnumbers.json') as f:
+        uidnumbers_data = f.read()
+    uid_numbers = json.loads(uidnumbers_data)
+
     # Test with existing user
     response = spankey_soap_api.nss_info(
         NSSDatabaseType.USER,
@@ -259,7 +268,7 @@ def test_nss_info() -> None:
             "gid": "100",
             "home": f"/home/u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1",
             "shell": "/bin/bash",
-            "uid": "500",
+            "uid": str(uid_numbers[f"u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1"]),
         }
     }
 

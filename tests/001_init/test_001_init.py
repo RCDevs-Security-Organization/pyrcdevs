@@ -16,7 +16,7 @@ from tests.constants import (CA_CERT_PATH, CA_KEY_PATH, CLUSTER_TYPE,
 
 def test_init() -> None:
     set_ldap()
-    generate_user_certificate()
+    generate_user_certificates()
 
 
 def ldap_recursive_delete(conn, base_dn, excluded_dns):
@@ -35,7 +35,7 @@ def ldap_recursive_delete(conn, base_dn, excluded_dns):
     return return_status
 
 
-def generate_user_certificate():
+def generate_user_certificates():
     """
     This method generates and saves to disk a certificate
     :return:
@@ -44,21 +44,25 @@ def generate_user_certificate():
     csr = generate_csr(key)
     cert = issue_cert(csr)
     save_certificate(cert)
+    cert2 = issue_cert(csr, 1)
+    save_certificate(cert2, f"{USER_CERT_PATH}_2")
 
 
-def save_certificate(cert) -> None:
+def save_certificate(cert, path: str = USER_CERT_PATH) -> None:
     """
     This method saves certificate as PEM to path defined by USER_CERT_PATH variable
     :param Certificate cert: certiticate
+    :param str path: path where to save certiticate
     """
-    with open(USER_CERT_PATH, "wb") as f:
+    with open(path, "wb") as f:
         f.write(cert.public_bytes(serialization.Encoding.PEM))
 
 
-def issue_cert(csr: CertificateSigningRequest) -> Certificate:
+def issue_cert(csr: CertificateSigningRequest, validity: int = 31536000) -> Certificate:
     """
     This method issue a certificate based on given CSR, using CA provided by CA_CERT_PATH and CA_KEY_PATH variables
     :param CertificateSigningRequest csr: CSR
+    :param int validity: how many seconds the certificate is valid (Default to one year)
     :return: issued certificate
     :rtype: Certificate
     """
@@ -114,7 +118,7 @@ def issue_cert(csr: CertificateSigningRequest) -> Certificate:
         .not_valid_after(
             # Our certificate will be valid for 10 days
             datetime.now()
-            + timedelta(days=365)
+            + timedelta(seconds=validity)
             # Sign our certificate with our private key
         )
         .sign(ca_key, hashes.SHA256())

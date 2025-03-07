@@ -1,7 +1,10 @@
 """This module implements tests for WebADM API Manager."""
 
 import base64
+import json
 import re
+import secrets
+from encodings.punycode import selective_find
 from http.client import responses
 
 import pytest
@@ -49,6 +52,17 @@ webadm_api_manager = WebADMManager(
 )
 
 
+uid_numbers = {}
+
+
+def get_random_uid_number():
+    list_uid_numbers = list(uid_numbers.values())
+    random_uid_number = 600 + secrets.randbits(10)
+    while random_uid_number in list_uid_numbers:
+        random_uid_number = 600 + secrets.randbits(10)
+    return random_uid_number
+
+
 def _test_malformed_dns(method, *args) -> None:
     # Test with wrong DN type.
     with pytest.raises(InvalidParams) as excinfo:
@@ -90,13 +104,10 @@ def _test_malformed_dns(method, *args) -> None:
     )
 
 
-def generate_user_attrs(
-    username: str, uid_number: int = None, gid_number: int = None
-) -> dict:
+def generate_user_attrs(username: str, gid_number: int = None) -> dict:
     """
     This method creates and returns a dictionary of user attributes
     :param str username: username of account
-    :param int uid_number: UID number of account for posixaccount objectclass
     :param int gid_number: GID number of account for posixaccount objectclass
     :return: a dictionary of user attributes
     :rtype: dict
@@ -105,12 +116,17 @@ def generate_user_attrs(
         "objectclass": ["person", "inetorgperson"],
         "sn": username,
         "cn": username,
-        "uid": username,
     }
-    if None not in (uid_number, gid_number):
+    if CLUSTER_TYPE == "mssp":
+        user_attributes["uid"] = username
+    else:
+        user_attributes["samaccountname"] = username
+    if gid_number is not None:
+        random_uid_number = get_random_uid_number()
+        uid_numbers[username] = random_uid_number
         # noinspection PyUnresolvedReferences
         user_attributes["objectclass"].append("posixAccount")
-        user_attributes["uidnumber"] = uid_number
+        user_attributes["uidnumber"] = random_uid_number
         user_attributes["gidnumber"] = gid_number
         user_attributes["homedirectory"] = f"/home/{username}"
         user_attributes["loginshell"] = "/bin/bash"
@@ -204,7 +220,7 @@ def test_create_ldap_object() -> None:
 
     # Test creating testuserapi1 object
     user_attributes = generate_user_attrs(
-        f"u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1", 500, 100
+        f"u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1", 100
     )
     response = webadm_api_manager.create_ldap_object(
         f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}",
@@ -214,7 +230,7 @@ def test_create_ldap_object() -> None:
 
     # Test creating testuserapi2 object
     user_attributes = generate_user_attrs(
-        f"u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_2", 501, 100
+        f"u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_2", 100
     )
     response = webadm_api_manager.create_ldap_object(
         f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_2,{WEBADM_BASE_DN}",
@@ -244,7 +260,7 @@ def test_create_ldap_object() -> None:
 
     # Test creating again testuserapi1 object
     with pytest.raises(pyrcdevs.manager.Manager.InternalError) as excinfo:
-        user_attributes = generate_user_attrs(f"u_{CLUSTER_TYPE}_api_1", 500, 100)
+        user_attributes = generate_user_attrs(f"u_{CLUSTER_TYPE}_api_1", 100)
         webadm_api_manager.create_ldap_object(
             f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}",
             user_attributes,
@@ -284,6 +300,9 @@ def test_create_ldap_object() -> None:
         group_attributes,
     )
     assert response
+
+    with open("/tmp/uidnumbers.json", "w") as json_file:
+        json_file.write(json.dumps(uid_numbers))
 
 
 def test_activate_ldap_object() -> None:
@@ -847,6 +866,22 @@ def test_set_user_attrs() -> None:
     )
     assert response
 
+    with open(f"{USER_CERT_PATH}_2", "rb") as user_cert_file2:
+        user_cert2 = user_cert_file2.read()
+    response = webadm_api_manager.set_user_attrs(
+        f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}",
+        {
+            "usercertificate": [
+                repr(user_cert2.decode())
+                .replace("\\n", "")
+                .replace("-----BEGIN CERTIFICATE-----", "")
+                .replace("-----END CERTIFICATE-----", "")
+            ]
+        },
+        True,
+    )
+    assert response
+
 
 def test_get_config_objects() -> None:
     """
@@ -1178,8 +1213,8 @@ def test_get_user_attrs() -> None:
     assert response["objectclass"] == DICT_USER_OBJECTCLASS[CLUSTER_TYPE]
     assert all(
         response[key] == [f"u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1"]
-        for key in ["cn", "sn", "uid"]
-        + (["samaccountname", "name"] if CLUSTER_TYPE in ("normal", "metadata") else [])
+        for key in ["cn", "sn"]
+        + (["samaccountname", "name"] if CLUSTER_TYPE in ("normal", "metadata") else ["uid"])
     )
     assert response["homedirectory"] == [
         f"/home/u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1"
@@ -1256,7 +1291,7 @@ def test_get_user_attrs() -> None:
             "100",
         ],
         "uidnumber": [
-            "500",
+            str(uid_numbers[f"u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1"])
         ],
     }
 
@@ -1405,3 +1440,273 @@ def test_get_user_data() -> None:
         "OpenOTP.EmergOTP",
         "OpenOTP.TokenID",
     ]
+
+
+def test_get_user_certificates() -> None:
+    """
+    Test Get_User_Certificates method.
+    """
+    # Test issue with DN parameter
+    _test_malformed_dns(webadm_api_manager.get_user_certificates)
+
+    # Test with unknown user
+    unknown_user_dn = f"cn={RANDOM_STRING},{WEBADM_BASE_DN}".lower()
+    with pytest.raises(pyrcdevs.manager.Manager.InternalError) as excinfo:
+        webadm_api_manager.get_user_certificates(unknown_user_dn)
+    exception_str = str(excinfo)
+    assert (
+        exception_str
+        == f"<ExceptionInfo InternalError(\"LDAP object '{unknown_user_dn}' does not exist\") tblen=3>"
+    )
+
+    # Test existing user without certificates
+    response = webadm_api_manager.get_user_certificates(
+        f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_2,{WEBADM_BASE_DN}".lower()
+    )
+    assert response == []
+
+    # Test existing user with certificates
+    with open(USER_CERT_PATH, "r") as f:
+        cert = "".join(f.readlines()).replace(
+            "-----END CERTIFICATE-----\n", "-----END CERTIFICATE-----"
+        )
+    with open(f"{USER_CERT_PATH}_2", "r") as f2:
+        cert2 = "".join(f2.readlines()).replace(
+            "-----END CERTIFICATE-----\n", "-----END CERTIFICATE-----"
+        )
+    response = webadm_api_manager.get_user_certificates(
+        f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}".lower()
+    )
+    response.sort()
+    expected_certs = [cert2, cert]
+    expected_certs.sort()
+    assert response == expected_certs
+
+    # TODO : valid parameter seems to have no effect (to check with developers)
+    # Test existing user with certificates, but only for valid certificates
+    response = webadm_api_manager.get_user_certificates(
+        f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}".lower(),
+        False,
+    )
+    response.sort()
+    expected_certs = [cert2, cert]
+    expected_certs.sort()
+    assert response == expected_certs
+
+
+def test_get_user_settings() -> None:
+    """
+    Test Get_User_Settings method.
+    """
+    # Test issue with DN parameter
+    _test_malformed_dns(webadm_api_manager.get_user_settings)
+
+    # Test with unknown user
+    unknown_user_dn = f"cn={RANDOM_STRING},{WEBADM_BASE_DN}".lower()
+    with pytest.raises(pyrcdevs.manager.Manager.InternalError) as excinfo:
+        webadm_api_manager.get_user_settings(unknown_user_dn)
+    exception_str = str(excinfo)
+    assert (
+        exception_str
+        == f"<ExceptionInfo InternalError(\"LDAP object '{unknown_user_dn}' does not exist\") tblen=3>"
+    )
+
+    # Test for all existing settings
+    response = webadm_api_manager.get_user_settings(
+        f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}".lower(),
+    )
+    assert isinstance(response, dict)
+    list_keys = list(response.keys())
+    list_keys.sort()
+    assert list_keys == [
+        "HelpDesk.AllowOTPTypes",
+        "HelpDesk.AllowOpenOTP",
+        "HelpDesk.AllowPKI",
+        "HelpDesk.AllowPassword",
+        "HelpDesk.AllowRegister",
+        "HelpDesk.AllowSSHKeyTypes",
+        "HelpDesk.AllowSpanKey",
+        "HelpDesk.AllowTokenTypes",
+        "HelpDesk.AllowUnlock",
+        "HelpDesk.AllowUserActivation",
+        "HelpDesk.AllowUserInfos",
+        "HelpDesk.DefaultTokenType",
+        "HelpDesk.EmergencyExpire",
+        "HelpDesk.EmergencyMaxUse",
+        "HelpDesk.MaxTokens",
+        "HelpDesk.SendPin",
+        "HelpDesk.SendPinMessage",
+        "HelpDesk.UserSearchAttrs",
+        "HelpDesk.UserSearchScopes",
+        "OpenID.AWSRoleNames",
+        "OpenID.AWSSessionTime",
+        "OpenID.ApplicationSSO",
+        "OpenID.AutoConfirm",
+        "OpenID.SessionTimeout",
+        "OpenOTP.BadgingArea",
+        "OpenOTP.BadgingData",
+        "OpenOTP.BadgingLocations",
+        "OpenOTP.BadgingMode",
+        "OpenOTP.BlockNotify",
+        "OpenOTP.BlockTime",
+        "OpenOTP.ChallengeTimeout",
+        "OpenOTP.EnableConfirm",
+        "OpenOTP.EnableLogin",
+        "OpenOTP.ExpireNotify",
+        "OpenOTP.HOTPLookAheadWindow",
+        "OpenOTP.LastOTPPerIP",
+        "OpenOTP.LastOTPTime",
+        "OpenOTP.ListAlgorithm",
+        "OpenOTP.ListChallengeMode",
+        "OpenOTP.ListSize",
+        "OpenOTP.LockTimer",
+        "OpenOTP.LoginMode",
+        "OpenOTP.MailMode",
+        "OpenOTP.MaxIdle",
+        "OpenOTP.MaxTries",
+        "OpenOTP.MaxWeak",
+        "OpenOTP.MobileTimeout",
+        "OpenOTP.OCRASuite",
+        "OpenOTP.OTPFallback",
+        "OpenOTP.OTPLength",
+        "OpenOTP.OTPPrefix",
+        "OpenOTP.OTPType",
+        "OpenOTP.OfflineExpire",
+        "OpenOTP.PasswordCheck",
+        "OpenOTP.PasswordReset",
+        "OpenOTP.PrefetchExpire",
+        "OpenOTP.PushCommit",
+        "OpenOTP.PushLogin",
+        "OpenOTP.PushVoice",
+        "OpenOTP.RecordEvents",
+        "OpenOTP.ReplyData",
+        "OpenOTP.SMSMode",
+        "OpenOTP.SMSType",
+        "OpenOTP.SecureMail",
+        "OpenOTP.SelfRegister",
+        "OpenOTP.TOTPTimeOffsetWindow",
+        "OpenOTP.TOTPTimeStep",
+        "OpenOTP.TokenExpire",
+        "OpenOTP.U2FPINMode",
+        "OpenOTP.ValidFrom",
+        "OpenOTP.ValidTo",
+        "OpenOTP.WeakNotify",
+        "PwReset.AllowUnlock",
+        "PwReset.LinkMode",
+        "PwReset.LinkTime",
+        "PwReset.PasswordAlpha",
+        "PwReset.PasswordByLength",
+        "PwReset.PasswordCase",
+        "PwReset.PasswordMaxLength",
+        "PwReset.PasswordMinLength",
+        "PwReset.PasswordNumeric",
+        "PwReset.PasswordStrength",
+        "PwReset.PasswordSymbol",
+        "PwReset.SMSType",
+        "PwReset.SecureMail",
+        "SelfDesk.AllowBadging",
+        "SelfDesk.AllowOTPTypes",
+        "SelfDesk.AllowOpenOTP",
+        "SelfDesk.AllowPKI",
+        "SelfDesk.AllowPassword",
+        "SelfDesk.AllowRegister",
+        "SelfDesk.AllowSSHKeyTypes",
+        "SelfDesk.AllowSign",
+        "SelfDesk.AllowSpanKey",
+        "SelfDesk.AllowTokenTypes",
+        "SelfDesk.AllowUserInfos",
+        "SelfDesk.CertValidity",
+        "SelfDesk.DefaultTokenType",
+        "SelfDesk.EmergencyExpire",
+        "SelfDesk.EmergencyMaxUse",
+        "SelfDesk.KeyPasswordLength",
+        "SelfReg.AllowRegister",
+        "SelfReg.AllowSSHKeyTypes",
+        "SelfReg.AllowTokenTypes",
+        "SelfReg.CertValidity",
+        "SelfReg.DefaultTokenType",
+        "SelfReg.KeyPasswordLength",
+        "SelfReg.LinkMode",
+        "SelfReg.LinkTime",
+        "SelfReg.SMSType",
+        "SelfReg.SecureMail",
+        "SpanKey.AddressFilter",
+        "SpanKey.AgentForwarding",
+        "SpanKey.AllowKeyFiles",
+        "SpanKey.AllowUserCerts",
+        "SpanKey.AllowedGroup",
+        "SpanKey.AllowedTags",
+        "SpanKey.EnableLogin",
+        "SpanKey.EnvVariables",
+        "SpanKey.ExpireNotify",
+        "SpanKey.ForwardFilter",
+        "SpanKey.GuestAccount",
+        "SpanKey.KeyExpire",
+        "SpanKey.KeyMaxUse",
+        "SpanKey.LockSessionTime",
+        "SpanKey.MaxSessionTime",
+        "SpanKey.OTPType",
+        "SpanKey.OTPTypeNI",
+        "SpanKey.PTYAllocation",
+        "SpanKey.PasswordChange",
+        "SpanKey.PasswordReset",
+        "SpanKey.PortForwarding",
+        "SpanKey.RecordAuditLogs",
+        "SpanKey.RecordSessions",
+        "SpanKey.RemoteCommand",
+        "SpanKey.RequireMFA",
+        "SpanKey.SelfRegister",
+        "SpanKey.SessionBadgeOut",
+        "SpanKey.SudoCommands",
+        "SpanKey.ValidFrom",
+        "SpanKey.ValidTo",
+        "SpanKey.X11Forwarding",
+    ]
+
+    # Test for non existing data
+    response = webadm_api_manager.get_user_settings(
+        f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}".lower(),
+        [f"{RANDOM_STRING}.{RANDOM_STRING}"],
+    )
+    assert response == []
+
+    # Test for 2 existing data
+    response = webadm_api_manager.get_user_settings(
+        f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}".lower(),
+        [
+            "SpanKey.PortForwarding",
+            "OpenOTP.ValidFrom",
+        ],
+    )
+    assert isinstance(response, dict)
+    list_keys = list(response.keys())
+    list_keys.sort()
+    assert list_keys == [
+        "OpenOTP.ValidFrom",
+        "SpanKey.PortForwarding",
+    ]
+
+
+def test_get_user_ids() -> None:
+    """
+    Test Get_User_IDs method.
+    """
+    # Test issue with DN parameter
+    _test_malformed_dns(webadm_api_manager.get_user_ids)
+
+    # Test with unknown user
+    unknown_user_dn = f"cn={RANDOM_STRING},{WEBADM_BASE_DN}".lower()
+    with pytest.raises(pyrcdevs.manager.Manager.InternalError) as excinfo:
+        webadm_api_manager.get_user_ids(unknown_user_dn)
+    exception_str = str(excinfo)
+    assert (
+        exception_str
+        == f"<ExceptionInfo InternalError(\"LDAP object '{unknown_user_dn}' does not exist\") tblen=3>"
+    )
+
+    # Test existing user
+    response = webadm_api_manager.get_user_ids(
+        f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}".lower()
+    )
+    assert isinstance(response, list)
+    assert response == [f"u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1"]
