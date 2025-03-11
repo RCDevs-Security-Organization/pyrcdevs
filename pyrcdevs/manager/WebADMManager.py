@@ -234,18 +234,15 @@ class WebADMManager(Manager):
         response = super().handle_api_manager_request("Check_User_Active", params)
         return response
 
-    def check_user_badging(self, dn, expires=None) -> bool:
+    def check_user_badging(self, dn) -> bool:
         """
         Return the badging time if the user is badged-in.
 
         :param str dn: distinghuished name of user account.
-        :param expires:
         :return: True if user is badged-in.
         :rtype: bool
         """
         params = {"dn": dn}
-        if expires is not None:
-            params["expires"] = expires
         response = super().handle_api_manager_request("Check_User_Badging", params)
         return response
 
@@ -492,18 +489,15 @@ class WebADMManager(Manager):
         response = super().handle_api_manager_request("Get_User_Attrs", params)
         return response
 
-    def get_user_certificates(self, dn, valid=None) -> list:
+    def get_user_certificates(self, dn) -> list:
         """
         Return an array of user certificates in PEM format.
 
         :param str dn: distinghuished name of user account.
-        :param bool valid: filter in only valid certificates
         :return: list of user certificates in PEM format.
         :rtype: list
         """
         params = {"dn": dn}
-        if valid is not None:
-            params["valid"] = valid
         response = super().handle_api_manager_request("Get_User_Certificates", params)
         return response
 

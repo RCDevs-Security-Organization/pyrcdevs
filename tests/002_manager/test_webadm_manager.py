@@ -3,12 +3,20 @@
 import base64
 import json
 import re
+import requests
 import secrets
-from encodings.punycode import selective_find
+import ssl
+import time
+from datetime import datetime, timedelta
+from enum import Enum
+from io import BytesIO
+from PIL import Image
+from requests import Session, get
 from http.client import responses
 
 import pytest
 from cffi.model import unknown_type
+from requests.adapters import HTTPAdapter
 
 import pyrcdevs
 from pyrcdevs import WebADMManager
@@ -22,6 +30,10 @@ from pyrcdevs.manager.WebADMManager import (
     ConfigObjectType,
     EventLogApplication,
     LicenseProduct,
+    QRCodeFormat,
+    QRCodeSize,
+    QRCodeMargin,
+    InventoryStatus,
 )
 from tests.constants import (
     CLUSTER_TYPE,
@@ -45,14 +57,32 @@ from tests.constants import (
     LIST_USER_ACCOUNT_LDAP_AD,
     LIST_USER_ACCOUNT_LDAP_SLAPD,
     DICT_USER_OBJECTCLASS,
+    EXCEPTION_NOT_RIGHT_TYPE,
+    CA_CERT_PATH,
 )
 
 webadm_api_manager = WebADMManager(
     WEBADM_HOST, WEBADM_API_USERNAME, WEBADM_API_PASSWORD, 443, False
 )
 
-
 uid_numbers = {}
+
+
+class BadgingAction(Enum):
+    """An enumeration class to detail possible badging actions"""
+
+    IN = "in"
+    OUT = "out"
+
+
+class HostHeaderSSLAdapter(HTTPAdapter):
+    def __init__(self, ssl_context=None, **kwargs):
+        self.ssl_context = ssl_context
+        super().__init__(**kwargs)
+
+    def init_poolmanager(self, *args, **kwargs):
+        kwargs["ssl_context"] = self.ssl_context
+        return super().init_poolmanager(*args, **kwargs)
 
 
 def get_random_uid_number():
@@ -63,23 +93,106 @@ def get_random_uid_number():
     return random_uid_number
 
 
-def _test_malformed_dns(method, *args) -> None:
+def webbadge(
+    host: str,
+    username: str,
+    password: str,
+    domain: str,
+    action: BadgingAction = BadgingAction.IN,
+    ip: str = None,
+    x_forwarded_for: str = None,
+) -> bool:
+    """
+    Badge in or badge out a user using Self-Desk webapp.
+
+    Using requests library, authenticate to the Self-Desk using given host, credentials,
+    then, do a badge out or badge in action, depending on given action.
+    :param str host: host name of WebADM
+    :param str username: account username
+    :param str password: account password
+    :param str domain: domain of account
+    :param BadgingAction action: badging action (default to BadgingAction.IN)
+    :param str ip: IP of SelfDesk applicaton (default to None).
+    :param str x_forwarded_for: X-Forwarded-For HTTP header value, which can be used to simulate a public IP (default
+    to None)
+    :return: boolean of badging action result
+    :rtype: bool
+    """
+    try:
+        if ip is None:
+            endpoint_host = host
+        else:
+            endpoint_host = ip
+
+        context = ssl.create_default_context()
+        context.verify_mode = ssl.CERT_REQUIRED
+
+        with Session() as s:
+            s.mount("https://", HostHeaderSSLAdapter(context))
+            s.headers.update({"Host": host})
+            if x_forwarded_for is not None:
+                s.headers["X-Forwarded-For"] = f"{x_forwarded_for}, 10.211.0.1"
+
+            s.get(
+                url=f"https://{endpoint_host}/webapps/selfdesk/login_uid.php",
+                verify=CA_CERT_PATH,
+                allow_redirects=True,
+            )
+            auth_resp = s.post(
+                url=f"https://{endpoint_host}/webapps/selfdesk/login_uid.php",
+                verify=CA_CERT_PATH,
+                data={
+                    "login": 1,
+                    "username": username,
+                    "password": password,
+                    "domain": domain,
+                },
+            )
+
+            if auth_resp.status_code != 200:
+                print(
+                    f"Issue authenticating to Self-Desk. HTTP return code is {auth_resp.status_code}!"
+                )
+                return False
+
+            tokens = re.findall(r"'index\.php\?token=([^']*)'", auth_resp.text)
+
+            if len(tokens) != 1:
+                print("Issue authenticating to Self-Desk: cannot get a token!")
+                return False
+
+            token = tokens[0]
+
+            badging_resp = s.get(
+                url=f"https://{endpoint_host}/webapps/selfdesk/badging.php?action={action.value}&token={token}",
+                verify=CA_CERT_PATH,
+            )
+
+            successes = re.findall(r"(Successfully badged )", badging_resp.text)
+
+            return len(successes) == 1
+    except requests.exceptions.ConnectionError as conn_error:
+        print(str(conn_error))
+        return False
+
+
+def _test_malformed_dns(method, pos, *args) -> None:
     # Test with wrong DN type.
     with pytest.raises(InvalidParams) as excinfo:
+        arguments = tuple(list(args[: pos - 1]) + [1] + list(args[pos - 1 :]))
         # noinspection PyTypeChecker
-        if args:
-            method(1, *args)
-        else:
-            method(1)
+        method(*arguments)
         # NOSONAR
     assert str(excinfo) == REGEX_PARAMETER_DN_NOT_STRING
 
-    # Test to get user attribute of a non existing object
+    # Test to non existing DN
     with pytest.raises(pyrcdevs.manager.Manager.InternalError) as excinfo:
-        if args:
-            method(f"CN=Not_exist_{RANDOM_STRING},{WEBADM_BASE_DN}", *args)
-        else:
-            method(f"CN=Not_exist_{RANDOM_STRING},{WEBADM_BASE_DN}")
+        arguments = tuple(
+            list(args[: pos - 1])
+            + [f"CN=Not_exist_{RANDOM_STRING},{WEBADM_BASE_DN}"]
+            + list(args[pos - 1 :])
+        )
+        method(*arguments)
     assert (
         str(excinfo)
         == f"<ExceptionInfo InternalError(\"LDAP object 'CN=Not_exist_{RANDOM_STRING},o=root' does not exist\") "
@@ -90,10 +203,10 @@ def _test_malformed_dns(method, *args) -> None:
     )
 
     with pytest.raises(pyrcdevs.manager.Manager.InternalError) as excinfo:
-        if args:
-            method(RANDOM_STRING, *args)
-        else:
-            method(RANDOM_STRING)
+        arguments = tuple(
+            list(args[: pos - 1]) + [RANDOM_STRING] + list(args[pos - 1 :])
+        )
+        method(*arguments)
     assert (
         str(excinfo)
         == f"<ExceptionInfo InternalError(\"Could not read LDAP object '{RANDOM_STRING}' (invalid DN)\") tblen=3>"
@@ -258,6 +371,16 @@ def test_create_ldap_object() -> None:
     )
     assert response
 
+    # Test creating api_5 object
+    user_attributes = generate_user_attrs(
+        f"u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_5"
+    )
+    response = webadm_api_manager.create_ldap_object(
+        f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_5,{WEBADM_BASE_DN}",
+        user_attributes,
+    )
+    assert response
+
     # Test creating again testuserapi1 object
     with pytest.raises(pyrcdevs.manager.Manager.InternalError) as excinfo:
         user_attributes = generate_user_attrs(f"u_{CLUSTER_TYPE}_api_1", 100)
@@ -304,13 +427,20 @@ def test_create_ldap_object() -> None:
     with open("/tmp/uidnumbers.json", "w") as json_file:
         json_file.write(json.dumps(uid_numbers))
 
+    # Test creating new_ou OU
+    response = webadm_api_manager.create_ldap_object(
+        f"ou=new_ou,{WEBADM_BASE_DN}",
+        {"objectclass": ["organizationalunit"], "ou": "new_ou"},
+    )
+    assert response
+
 
 def test_activate_ldap_object() -> None:
     """
     Test Activate_LDAP_Object method.
     """
     # Test issue with DN parameter
-    _test_malformed_dns(webadm_api_manager.activate_ldap_object)
+    _test_malformed_dns(webadm_api_manager.activate_ldap_object, 1)
 
     # Test to activate existing account
     response = webadm_api_manager.activate_ldap_object(
@@ -375,7 +505,7 @@ def test_deactivate_ldap_object() -> None:
     Test Deactivate_LDAP_Object method.
     """
     # Test issue with DN parameter
-    _test_malformed_dns(webadm_api_manager.deactivate_ldap_object)
+    _test_malformed_dns(webadm_api_manager.deactivate_ldap_object, 1)
 
     # Test to deactivate an activated account
     response = webadm_api_manager.deactivate_ldap_object(
@@ -1196,7 +1326,7 @@ def test_get_user_attrs() -> None:
     Test Get_User_Attrs method.
     """
     # Test issue with DN parameter
-    _test_malformed_dns(webadm_api_manager.get_user_attrs)
+    _test_malformed_dns(webadm_api_manager.get_user_attrs, 1)
 
     response = webadm_api_manager.get_user_attrs(
         f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}"
@@ -1214,7 +1344,11 @@ def test_get_user_attrs() -> None:
     assert all(
         response[key] == [f"u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1"]
         for key in ["cn", "sn"]
-        + (["samaccountname", "name"] if CLUSTER_TYPE in ("normal", "metadata") else ["uid"])
+        + (
+            ["samaccountname", "name"]
+            if CLUSTER_TYPE in ("normal", "metadata")
+            else ["uid"]
+        )
     )
     assert response["homedirectory"] == [
         f"/home/u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1"
@@ -1333,7 +1467,7 @@ def test_get_user_domains() -> None:
     Test Get_User_Domains method.
     """
     # Test issue with DN parameter
-    _test_malformed_dns(webadm_api_manager.get_user_domains)
+    _test_malformed_dns(webadm_api_manager.get_user_domains, 1)
 
     # Test existing user
     response = webadm_api_manager.get_user_domains(
@@ -1348,7 +1482,7 @@ def test_get_user_groups() -> None:
     Test Get_User_Groups method.
     """
     # Test issue with DN parameter
-    _test_malformed_dns(webadm_api_manager.get_user_groups, "Domain_Enabled")
+    _test_malformed_dns(webadm_api_manager.get_user_groups, 1, "Domain_Enabled")
 
     # Test with unknown domain
     with pytest.raises(pyrcdevs.manager.Manager.InternalError) as excinfo:
@@ -1387,7 +1521,7 @@ def test_get_user_data() -> None:
     Test Get_User_Data method.
     """
     # Test issue with DN parameter
-    _test_malformed_dns(webadm_api_manager.get_user_data)
+    _test_malformed_dns(webadm_api_manager.get_user_data, 1)
 
     # Test with unknown user
     unknown_user_dn = f"cn={RANDOM_STRING},{WEBADM_BASE_DN}".lower()
@@ -1447,7 +1581,7 @@ def test_get_user_certificates() -> None:
     Test Get_User_Certificates method.
     """
     # Test issue with DN parameter
-    _test_malformed_dns(webadm_api_manager.get_user_certificates)
+    _test_malformed_dns(webadm_api_manager.get_user_certificates, 1)
 
     # Test with unknown user
     unknown_user_dn = f"cn={RANDOM_STRING},{WEBADM_BASE_DN}".lower()
@@ -1482,24 +1616,13 @@ def test_get_user_certificates() -> None:
     expected_certs.sort()
     assert response == expected_certs
 
-    # TODO : valid parameter seems to have no effect (to check with developers)
-    # Test existing user with certificates, but only for valid certificates
-    response = webadm_api_manager.get_user_certificates(
-        f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}".lower(),
-        False,
-    )
-    response.sort()
-    expected_certs = [cert2, cert]
-    expected_certs.sort()
-    assert response == expected_certs
-
 
 def test_get_user_settings() -> None:
     """
     Test Get_User_Settings method.
     """
     # Test issue with DN parameter
-    _test_malformed_dns(webadm_api_manager.get_user_settings)
+    _test_malformed_dns(webadm_api_manager.get_user_settings, 1)
 
     # Test with unknown user
     unknown_user_dn = f"cn={RANDOM_STRING},{WEBADM_BASE_DN}".lower()
@@ -1692,7 +1815,7 @@ def test_get_user_ids() -> None:
     Test Get_User_IDs method.
     """
     # Test issue with DN parameter
-    _test_malformed_dns(webadm_api_manager.get_user_ids)
+    _test_malformed_dns(webadm_api_manager.get_user_ids, 1)
 
     # Test with unknown user
     unknown_user_dn = f"cn={RANDOM_STRING},{WEBADM_BASE_DN}".lower()
@@ -1710,3 +1833,568 @@ def test_get_user_ids() -> None:
     )
     assert isinstance(response, list)
     assert response == [f"u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1"]
+
+
+def test_get_qrcode() -> None:
+    """
+    Test Get_QRCode method.
+    """
+    # Test with bad type for size argument.
+    with pytest.raises(TypeError) as excinfo:
+        # noinspection PyTypeChecker
+        webadm_api_manager.get_qrcode("https://www.rcdevs.com", size=1)  # NOSONAR
+    assert (
+        str(excinfo)
+        == "<ExceptionInfo TypeError('size type is not QRCodeSize') tblen=2>"
+    )
+
+    # Test with bad type for format argument.
+    with pytest.raises(TypeError) as excinfo:
+        # noinspection PyTypeChecker
+        webadm_api_manager.get_qrcode(
+            "https://www.rcdevs.com", format_="PNG"
+        )  # NOSONAR
+    assert (
+        str(excinfo)
+        == "<ExceptionInfo TypeError('format type is not QRCodeFormat') tblen=2>"
+    )
+
+    # Test with bad type for margin argument.
+    with pytest.raises(TypeError) as excinfo:
+        # noinspection PyTypeChecker
+        webadm_api_manager.get_qrcode("https://www.rcdevs.com", margin=1)  # NOSONAR
+    assert (
+        str(excinfo)
+        == "<ExceptionInfo TypeError('margin type is not QRCodeMargin') tblen=2>"
+    )
+
+    # Test that only providing url returns a GIF
+    response = webadm_api_manager.get_qrcode("https://www.rcdevs.com")
+    assert re.compile(REGEX_BASE64).search(response)
+    image_data = base64.b64decode(response)
+    image = Image.open(BytesIO(image_data))
+    assert image.format == "GIF"
+
+    # Test providing image format returns corresponding format
+    for image_format in QRCodeFormat:
+        response = webadm_api_manager.get_qrcode(
+            "https://www.rcdevs.com", format_=image_format
+        )
+        assert re.compile(REGEX_BASE64).search(response)
+        image_data = base64.b64decode(response)
+        if image_format == QRCodeFormat.TXT:
+            try:
+                image_data.decode("utf-8")
+            except (LookupError, UnicodeDecodeError):
+                assert "TXT image is not UTF-8" == ""
+            continue
+        image = Image.open(BytesIO(image_data))
+        assert (
+            image.format == "JPEG"
+            if image_format == QRCodeFormat.JPG
+            else image_format.value
+        )
+
+    for image_format in QRCodeFormat:
+        if image_format == QRCodeFormat.TXT:
+            continue
+        for image_size in QRCodeSize:
+            for image_margin in QRCodeMargin:
+                response = webadm_api_manager.get_qrcode(
+                    "https://www.rcdevs.com",
+                    size=image_size,
+                    format_=image_format,
+                    margin=image_margin,
+                )
+                assert re.compile(REGEX_BASE64).search(response)
+                image_data = base64.b64decode(response)
+                image = Image.open(BytesIO(image_data))
+                assert image.size == (
+                    (25 + image_margin.value * 2) * image_size.value,
+                    (25 + image_margin.value * 2) * image_size.value,
+                )
+
+
+def test_import_inventory_item() -> None:
+    """
+    Test Import_Inventory_Item method.
+    """
+
+    # Test with bad type for  argument.
+    with pytest.raises(TypeError) as excinfo:
+        # noinspection PyTypeChecker
+        webadm_api_manager.import_inventory_item(
+            "OTP Token",
+            "151147490827268",
+            "Yubikey #2573124",
+            {
+                "TokenType": "WVVCSUtFWQ==",
+                "TokenID": "iXfEf9wE",
+                "TokenKey": "SddJ2mYccUe1y9TbPxUte+jH0PT/tQ==",
+                "DataMode": "Aw==",
+                "TokenState": "NzY4",
+            },
+            status="Valid",
+        )  # NOSONAR
+    assert str(excinfo) == EXCEPTION_NOT_RIGHT_TYPE.format("status", "InventoryStatus")
+
+    # Test importing Yubikey
+    response = webadm_api_manager.import_inventory_item(
+        "OTP Token",
+        "151147490827268",
+        "Yubikey #2573124",
+        {
+            "TokenType": "WVVCSUtFWQ==",
+            "TokenID": "iXfEf9wE",
+            "TokenKey": "SddJ2mYccUe1y9TbPxUte+jH0PT/tQ==",
+            "DataMode": "Aw==",
+            "TokenState": "NzY4",
+        },
+    )
+    assert response
+
+    # Test importing same Yubikey a second time
+    with pytest.raises(pyrcdevs.manager.Manager.InternalError) as excinfo:
+        webadm_api_manager.import_inventory_item(
+            "OTP Token",
+            "151147490827268",
+            "Yubikey #2573124",
+            {
+                "TokenType": "WVVCSUtFWQ==",
+                "TokenID": "iXfEf9wE",
+                "TokenKey": "SddJ2mYccUe1y9TbPxUte+jH0PT/tQ==",
+                "DataMode": "Aw==",
+                "TokenState": "NzY4",
+            },
+        )
+    assert str(excinfo).endswith(
+        "Duplicate entry 'OTP Token-151147490827268' for key 'PRIMARY'\") tblen=3>"
+    )
+
+    # Test importing a yubikey with status to expired
+    response = webadm_api_manager.import_inventory_item(
+        "OTP Token",
+        "100000000000000001",
+        "Yubikey #2573124",
+        {
+            "TokenType": "WVVCSUtFWQ==",
+            "TokenID": "iXfEf9wE",
+            "TokenKey": "SddJ2mYccUe1y9TbPxUte+jH0PT/tQ==",
+            "DataMode": "Aw==",
+            "TokenState": "NzY4",
+        },
+        status=InventoryStatus.EXPIRED,
+    )
+
+    assert response
+
+    # Test importing a yubikey with status to lost
+    response = webadm_api_manager.import_inventory_item(
+        "OTP Token",
+        "100000000000000002",
+        "Yubikey #2573124",
+        {
+            "TokenType": "WVVCSUtFWQ==",
+            "TokenID": "iXfEf9wE",
+            "TokenKey": "SddJ2mYccUe1y9TbPxUte+jH0PT/tQ==",
+            "DataMode": "Aw==",
+            "TokenState": "NzY4",
+        },
+        status=InventoryStatus.LOST,
+    )
+    assert response
+
+    # Test importing a yubikey with status to valid
+    response = webadm_api_manager.import_inventory_item(
+        "OTP Token",
+        "100000000000000003",
+        "Yubikey #2573124",
+        {
+            "TokenType": "WVVCSUtFWQ==",
+            "TokenID": "iXfEf9wE",
+            "TokenKey": "SddJ2mYccUe1y9TbPxUte+jH0PT/tQ==",
+            "DataMode": "Aw==",
+            "TokenState": "NzY4",
+        },
+        status=InventoryStatus.VALID,
+    )
+    assert response
+
+    # Test importing a yubikey with status to broken
+    response = webadm_api_manager.import_inventory_item(
+        "OTP Token",
+        "100000000000000004",
+        "Yubikey #2573124",
+        {
+            "TokenType": "WVVCSUtFWQ==",
+            "TokenID": "iXfEf9wE",
+            "TokenKey": "SddJ2mYccUe1y9TbPxUte+jH0PT/tQ==",
+            "DataMode": "Aw==",
+            "TokenState": "NzY4",
+        },
+        status=InventoryStatus.BROKEN,
+    )
+    assert response
+
+    # Test importing a yubikey with status to broken
+    response = webadm_api_manager.import_inventory_item(
+        "OTP Token",
+        "100000000000000005",
+        "Yubikey #2573124",
+        {
+            "TokenType": "WVVCSUtFWQ==",
+            "TokenID": "iXfEf9wE",
+            "TokenKey": "SddJ2mYccUe1y9TbPxUte+jH0PT/tQ==",
+            "DataMode": "Aw==",
+            "TokenState": "NzY4",
+        },
+        active=False,
+    )
+    assert response
+
+    # Test importing PIV
+    response = webadm_api_manager.import_inventory_item(
+        "PIV Device",
+        "67090940",
+        "PIV NitroKey",
+        {
+            "PublicKey": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwiBZ8g4yHliKPSr"
+            "/Kg4EcAJLHch+Kh6w6emzn9ZRxSfrBofSO45x17oi7UsG8OIrBRMIVTgXOzqMbT"
+            "wnnPjkpep9dKe4FHEMaPEvNYhAwHDMGVhbYBcf7Ru3CsCM9NPqmbjeV/+zGsMxq8X"
+            "bZLKPdoW4EjtneTpqD8ummip1ZBTuaFXGi3D/SDxAWTy3DlA+QtU5E2HpU7tZghi5"
+            "ygiy9przQct/pMCNX8WJgkLC58g/UtnVeClkh2GGalFrODR2hY0lhWQYhzNH5FzIBm"
+            "EENcPucSwB7/r0abV9hdW52qWXECGBIjKAXrA16n/4QsFJNlPJaysl5Pv4ZBqM86jo"
+            "gwIDAQAB"
+        },
+    )
+    assert response
+
+
+def test_link_inventory_item() -> None:
+    """
+    Test Link_Inventory_Item method.
+    """
+
+    _test_malformed_dns(
+        webadm_api_manager.link_inventory_item, 3, "OTP Token", "100000000000001"
+    )
+
+    response = webadm_api_manager.link_inventory_item(
+        "OTP Token",
+        "100000000000000001",
+        f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}".lower(),
+    )
+    assert response
+
+
+def test_search_inventory_items() -> None:
+    """
+    Test Search_Inventory_Items method.
+    """
+    # sleep for 5 seconds to avoid having same current time as import time
+    time.sleep(5)
+
+    # Get current time
+    current_time = datetime.now()
+    one_hour_earlier = current_time - timedelta(hours=1)
+    current_time_formatted = current_time.strftime("%Y-%m-%d %H:%M:%S")
+    one_hour_earlier_formatted = one_hour_earlier.strftime("%Y-%m-%d %H:%M:%S")
+
+    # Test with bad type for status argument.
+    with pytest.raises(TypeError) as excinfo:
+        # noinspection PyTypeChecker
+        webadm_api_manager.search_inventory_items(
+            "OTP Token", status="Valid"
+        )  # NOSONAR
+    assert str(excinfo) == EXCEPTION_NOT_RIGHT_TYPE.format("status", "InventoryStatus")
+
+    # Get all OTP Token items
+    response = webadm_api_manager.search_inventory_items("OTP Token")
+    assert response == [
+        "100000000000000001",
+        "100000000000000002",
+        "100000000000000003",
+        "100000000000000004",
+        "100000000000000005",
+        "151147490827268",
+    ]
+
+    # Get all PIV items
+    response = webadm_api_manager.search_inventory_items("PIV Device")
+    assert response == [
+        "67090940",
+    ]
+
+    # Get all enabled OTP Token items
+    response = webadm_api_manager.search_inventory_items("OTP Token", active=True)
+    assert response == [
+        "100000000000000001",
+        "100000000000000002",
+        "100000000000000003",
+        "100000000000000004",
+        "151147490827268",
+    ]
+
+    # Get all disabled OTP Token items
+    response = webadm_api_manager.search_inventory_items("OTP Token", active=False)
+    assert response == [
+        "100000000000000005",
+    ]
+
+    # Get all valid OTP Token items
+    response = webadm_api_manager.search_inventory_items(
+        "OTP Token", status=InventoryStatus.VALID
+    )
+    assert response == [
+        "100000000000000003",
+        "100000000000000005",
+        "151147490827268",
+    ]
+
+    # Get all expired OTP Token items
+    response = webadm_api_manager.search_inventory_items(
+        "OTP Token", status=InventoryStatus.EXPIRED
+    )
+    assert response == [
+        "100000000000000001",
+    ]
+
+    # Get all lost OTP Token items
+    response = webadm_api_manager.search_inventory_items(
+        "OTP Token", status=InventoryStatus.LOST
+    )
+    assert response == [
+        "100000000000000002",
+    ]
+
+    # Get all broken OTP Token items
+    response = webadm_api_manager.search_inventory_items(
+        "OTP Token", status=InventoryStatus.BROKEN
+    )
+    assert response == [
+        "100000000000000004",
+    ]
+
+    # Get all OTP Token with two consecutive 00 in reference
+    response = webadm_api_manager.search_inventory_items("OTP Token", filter_="*00*")
+    assert response == [
+        "100000000000000001",
+        "100000000000000002",
+        "100000000000000003",
+        "100000000000000004",
+        "100000000000000005",
+    ]
+
+    # Get all linked OTP Token
+    response = webadm_api_manager.search_inventory_items("OTP Token", linked=True)
+    assert response == [
+        "100000000000000001",
+    ]
+
+    # Get all unlinked OTP Token
+    response = webadm_api_manager.search_inventory_items("OTP Token", linked=False)
+    assert response == [
+        "100000000000000002",
+        "100000000000000003",
+        "100000000000000004",
+        "100000000000000005",
+        "151147490827268",
+    ]
+
+    # Test for items imported after current time (must be zero items)
+    response = webadm_api_manager.search_inventory_items(
+        "OTP Token", start=current_time_formatted
+    )
+    assert response == []
+
+    # Test for items imported at least one hour ago (must be all OTP Token items)
+    response = webadm_api_manager.search_inventory_items(
+        "OTP Token", start=one_hour_earlier_formatted
+    )
+    assert response == [
+        "100000000000000001",
+        "100000000000000002",
+        "100000000000000003",
+        "100000000000000004",
+        "100000000000000005",
+        "151147490827268",
+    ]
+
+    # Test for items imported at most one hour ago (must be zero items)
+    response = webadm_api_manager.search_inventory_items(
+        "OTP Token", stop=one_hour_earlier_formatted
+    )
+    assert response == []
+
+    # Test for items imported before current time (must be all OTP Token items)
+    response = webadm_api_manager.search_inventory_items(
+        "OTP Token", stop=current_time_formatted
+    )
+    assert response == [
+        "100000000000000001",
+        "100000000000000002",
+        "100000000000000003",
+        "100000000000000004",
+        "100000000000000005",
+        "151147490827268",
+    ]
+
+
+def test_check_user_badging() -> None:
+    """
+    Test Check_User_Badging method.
+    """
+
+    current_timestamp = datetime.timestamp(datetime.now())
+    time.sleep(5)
+
+    # Test with non existing object
+    response = webadm_api_manager.check_user_badging(RANDOM_STRING)
+    assert not response
+
+    # Test with existing object but not badged in
+    user_dn = f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_4,{WEBADM_BASE_DN}"
+    if CLUSTER_TYPE == "mssp":
+        user_dn = user_dn.lower()
+    response = webadm_api_manager.check_user_badging(user_dn)
+    assert not response
+
+    webbadge(
+        WEBADM_HOST,
+        f"u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_4",
+        DEFAULT_PASSWORD,
+        "Domain_Enabled",
+        BadgingAction.IN,
+    )
+
+    # Test with existing badged in object
+    response = webadm_api_manager.check_user_badging(user_dn)
+    assert isinstance(response, int)
+    assert response - current_timestamp >= 4
+
+
+def test_move_ldap_object() -> None:
+    """
+    Test Move_LDAP_Object method.
+    """
+
+    _test_malformed_dns(
+        webadm_api_manager.move_ldap_object, 1, f"ou=new_ou,{WEBADM_BASE_DN}"
+    )
+
+    response = webadm_api_manager.move_ldap_object(
+        f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_5,{WEBADM_BASE_DN}",
+        f"ou=new_ou,{WEBADM_BASE_DN}",
+    )
+    assert response
+
+
+def test_rename_ldap_object() -> None:
+    """
+    Test Rename_LDAP_Object method.
+    """
+
+    _test_malformed_dns(webadm_api_manager.rename_ldap_object, 1, "new_name")
+
+    response = webadm_api_manager.rename_ldap_object(
+        f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_5,ou=new_ou,{WEBADM_BASE_DN}",
+        f"u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_5_n",
+    )
+    assert response
+
+
+def test_remove_user_attrs() -> None:
+    """
+    Test Remove_User_Attrs method.
+    """
+
+    _test_malformed_dns(
+        webadm_api_manager.remove_user_attrs, 1, {"mobile": ["+33123456789"]}
+    )
+
+    # Determine attribute which can have multiple values
+    tested_attribute = "description" if CLUSTER_TYPE == "mssp" else "proxyaddresses"
+
+    # Add two values for proxyAddresses attribute
+    response = webadm_api_manager.set_user_attrs(
+        f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_5_n,ou=new_ou,{WEBADM_BASE_DN}",
+        {tested_attribute: ["value1", "value2"]},
+    )
+    assert response
+
+    response = webadm_api_manager.search_ldap_objects(
+        f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_5_n,ou=new_ou,{WEBADM_BASE_DN}",
+        attrs=[tested_attribute],
+    )
+    assert isinstance(response, dict)
+    keys = list(response.keys())
+    assert len(keys) == 1
+    assert (
+        keys[0].lower()
+        == f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_5_n,OU=new_ou,{WEBADM_BASE_DN}".lower()
+    )
+    values = list(response.values())
+    assert len(values) == 1
+    assert values[0] == {tested_attribute: ["value1", "value2"]} or values[0] == {tested_attribute: ["value2", "value1"]}
+
+    response = webadm_api_manager.remove_user_attrs(
+        f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_5_n,ou=new_ou,{WEBADM_BASE_DN}",
+        {tested_attribute: ["value1"]},
+        True,
+    )
+    assert response
+
+    response = webadm_api_manager.search_ldap_objects(
+        f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_5_n,ou=new_ou,{WEBADM_BASE_DN}",
+        attrs=[tested_attribute],
+    )
+    assert isinstance(response, dict)
+    keys = list(response.keys())
+    assert len(keys) == 1
+    assert (
+        keys[0].lower()
+        == f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_5_n,OU=new_ou,{WEBADM_BASE_DN}".lower()
+    )
+    values = list(response.values())
+    assert len(values) == 1
+    assert values[0] == {tested_attribute: ["value2"]}
+
+    response = webadm_api_manager.remove_user_attrs(
+        f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_5_n,ou=new_ou,{WEBADM_BASE_DN}",
+        [tested_attribute],
+    )
+    assert response
+
+    response = webadm_api_manager.search_ldap_objects(
+        f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_5_n,ou=new_ou,{WEBADM_BASE_DN}",
+        attrs=[tested_attribute],
+    )
+    assert isinstance(response, dict)
+    keys = list(response.keys())
+    assert len(keys) == 1
+    assert (
+        keys[0].lower()
+        == f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_5_n,OU=new_ou,{WEBADM_BASE_DN}".lower()
+    )
+    values = list(response.values())
+    assert len(values) == 1
+    assert values[0] == []
+
+
+def test_remove_ldap_object() -> None:
+    """
+    Test Remove_LDAP_Object method.
+    """
+
+    _test_malformed_dns(webadm_api_manager.remove_ldap_object, 1)
+
+    response = webadm_api_manager.remove_ldap_object(
+        f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_5_n,ou=new_ou,{WEBADM_BASE_DN}",
+    )
+    assert response
+
+    with pytest.raises(pyrcdevs.manager.Manager.InternalError) as excinfo:
+        webadm_api_manager.search_ldap_objects(
+            f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_5_n,ou=new_ou,{WEBADM_BASE_DN}",
+        )
+    assert str(excinfo) == f"<ExceptionInfo InternalError(\"LDAP container 'CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_5_n,ou=new_ou,{WEBADM_BASE_DN}' does not exist\") tblen=3>"
