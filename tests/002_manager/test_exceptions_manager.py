@@ -6,15 +6,10 @@ from urllib3.exceptions import MaxRetryError, NewConnectionError
 
 from pyrcdevs import WebADMManager
 from pyrcdevs.manager.Manager import InvalidAPICredentials
-from tests.constants import (
-    REGEX_CONNECT_TIMEOUT,
-    REGEX_CONNECTION_REFUSED,
-    REGEX_FAILED_TO_RESOLVE,
-    REGEX_MAX_RETRY,
-    WEBADM_API_PASSWORD,
-    WEBADM_API_USERNAME,
-    WEBADM_HOST,
-)
+from tests.constants import (REGEX_CONNECT_TIMEOUT, REGEX_CONNECTION_REFUSED,
+                             REGEX_FAILED_TO_RESOLVE, REGEX_MAX_RETRY,
+                             WEBADM_API_PASSWORD, WEBADM_API_USERNAME,
+                             WEBADM_HOST)
 
 
 def test_wrong_host() -> None:

@@ -193,7 +193,7 @@ class OpenOTPManager(Manager):
         block=None,
         expire=None,
         reset=None,
-    ) -> Any:
+    ) -> dict | bool:
         """
         Get Domain Statistics.
 
@@ -214,7 +214,7 @@ class OpenOTPManager(Manager):
         :param bool expire:
         :param bool reset:
         :return: array indexed with users' DN and containing the user statistics and returns false on error.
-        :rtype: Any
+        :rtype: dict | bool
         """
         params = {"domain": domain}
         if filter is not None:
@@ -681,7 +681,7 @@ class OpenOTPManager(Manager):
         Initialize a mobile communication session when mobile Push is enabled.
         The timeout (in seconds) must be long enough for the Token to enrol the provided QRCode.
 
-        :param int timeout:  in seconds, must be long enough for the Token to enrol the provided QRCode.
+        :param int timeout: in seconds, must be long enough for the Token to enrol the provided QRCode.
         :param str pincode: a pincode to protect QR code
         :param str dn: distinguished name of account
         :return: the session ID on success and NULL on error.

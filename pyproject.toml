@@ -51,6 +51,7 @@ env = [
     "LDAP_USERNAME = ",
     "LDAP_PASSWORD = ",
     "LDAP_BASE_DN = ",
+    "MAILSERVER = ",
     "SMS_MOBILE = ",
     "GROUP_OBJECTCLASS = group",
     "CLUSTER_TYPE = ",

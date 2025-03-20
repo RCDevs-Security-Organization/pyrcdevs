@@ -781,7 +781,7 @@ class WebADMManager(Manager):
         :param str body: body of email
         :param str from_: sender of email
         :param str certificate: certificate of recipient so email is encrypted
-        :param lsit attachments: list of file to attach to email
+        :param list attachments: list of file to attach to email
         :return: true on success and false on error.
         :rtype: bool
         """
@@ -801,8 +801,8 @@ class WebADMManager(Manager):
 
         :param str application: RCDevs' target mobile app name.
         :param str to: PlatformId:PushId of smartphone
-        :param list options: list of push options
-        :param list data: list of push data
+        :param dict options: list of push options
+        :param dict data: list of push data
         :param str timeout: timeout for push notification
         :return: true on success and false on error.
         :rtype: bool
@@ -953,14 +953,14 @@ class WebADMManager(Manager):
         )
         return response
 
-    def sync_ldap_delete(self, container: str, contents: dict) -> int or bool:
+    def sync_ldap_delete(self, container: str, contents: list) -> int or bool:
         """
         Synchronizes LDAP object removals in a tenant context.
 
         This method is used by RCDevs AD/LDAP sync utilities.
 
         :param str container: base DN on which apply delete
-        :param dict contents: list of objects to be excluded from deletion
+        :param list contents: list of objects to be excluded from deletion
         :return: the number of remaining objects on success and false on error.
         :rtype: int|bool
         """
@@ -989,7 +989,7 @@ class WebADMManager(Manager):
         if type_ is not None:
             params["type"] = type_.value
         if uuid is not None:
-            params["scope"] = uuid
+            params["uuid"] = uuid
         response = super().handle_api_manager_request("Sync_LDAP_Object", params)
         return response
 

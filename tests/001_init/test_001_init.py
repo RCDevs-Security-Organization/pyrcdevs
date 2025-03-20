@@ -9,9 +9,17 @@ from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey
 from cryptography.x509 import Certificate, CertificateSigningRequest
 from ldap.ldapobject import SimpleLDAPObject
 
-from tests.constants import (CA_CERT_PATH, CA_KEY_PATH, CLUSTER_TYPE,
-                             LDAP_BASE_DN, LDAP_HOST, LDAP_PASSWORD,
-                             LDAP_USERNAME, TESTER_NAME, USER_CERT_PATH)
+from tests.constants import (
+    CA_CERT_PATH,
+    CA_KEY_PATH,
+    CLUSTER_TYPE,
+    LDAP_BASE_DN,
+    LDAP_HOST,
+    LDAP_PASSWORD,
+    LDAP_USERNAME,
+    TESTER_NAME,
+    USER_CERT_PATH,
+)
 
 
 def test_init() -> None:
@@ -41,21 +49,34 @@ def generate_user_certificates():
     :return:
     """
     key = generate_rsa_private_key()
+    save_crypto_file(key, f"/tmp/user.key")
     csr = generate_csr(key)
+    save_crypto_file(csr, f"/tmp/csr.csr")
     cert = issue_cert(csr)
-    save_certificate(cert)
+    save_crypto_file(cert)
     cert2 = issue_cert(csr, 1)
-    save_certificate(cert2, f"{USER_CERT_PATH}_2")
+    save_crypto_file(cert2, f"{USER_CERT_PATH}_2")
+    cert3 = issue_cert(csr)
+    save_crypto_file(cert3, f"{USER_CERT_PATH}_3")
 
 
-def save_certificate(cert, path: str = USER_CERT_PATH) -> None:
+def save_crypto_file(file, path: str = USER_CERT_PATH) -> None:
     """
     This method saves certificate as PEM to path defined by USER_CERT_PATH variable
-    :param Certificate cert: certiticate
+    :param Certificate|CertificateSigningRequest|RSAPrivateKey file: cryptographic file
     :param str path: path where to save certiticate
     """
     with open(path, "wb") as f:
-        f.write(cert.public_bytes(serialization.Encoding.PEM))
+        if isinstance(file, RSAPrivateKey):
+            f.write(
+                file.private_bytes(
+                    serialization.Encoding.PEM,
+                    format=serialization.PrivateFormat.TraditionalOpenSSL,
+                    encryption_algorithm=serialization.NoEncryption(),
+                )
+            )
+        else:
+            f.write(file.public_bytes(serialization.Encoding.PEM))
 
 
 def issue_cert(csr: CertificateSigningRequest, validity: int = 31536000) -> Certificate:

@@ -7,27 +7,15 @@ import pytest
 
 from pyrcdevs import SpanKeySoap
 from pyrcdevs.soap.SpanKeySoap import NSSDatabaseType
-from tests.constants import (
-    AUDITD_COMMAND,
-    CLUSTER_TYPE,
-    DEFAULT_PASSWORD,
-    MSG_INVALID_OR_NOT_FOUND_USER,
-    MSG_INVALID_PASSWORD,
-    MSG_INVALID_REQUEST,
-    MSG_MISSING_SSH_KEY,
-    MSG_OPERATION_SUCCESS,
-    MSG_SERVER_ERROR,
-    MSG_SESSION_NOT_STARTED,
-    MSG_WELCOME_MESSAGE,
-    RANDOM_STRING,
-    REGEX_SESSION_FORMAT,
-    REGEX_STATUS_RESPONSE,
-    SETTING_SPANKEY,
-    SPANKEY_API_KEY,
-    SSH_KEY_BACKUP,
-    TESTER_NAME,
-    WEBADM_HOST,
-)
+from tests.constants import (AUDITD_COMMAND, CLUSTER_TYPE, DEFAULT_PASSWORD,
+                             MSG_INVALID_OR_NOT_FOUND_USER,
+                             MSG_INVALID_PASSWORD, MSG_INVALID_REQUEST,
+                             MSG_MISSING_SSH_KEY, MSG_OPERATION_SUCCESS,
+                             MSG_SERVER_ERROR, MSG_SESSION_NOT_STARTED,
+                             MSG_WELCOME_MESSAGE, RANDOM_STRING,
+                             REGEX_SESSION_FORMAT, REGEX_STATUS_RESPONSE,
+                             SETTING_SPANKEY, SPANKEY_API_KEY, SSH_KEY_BACKUP,
+                             TESTER_NAME, WEBADM_HOST)
 
 spankey_soap_api = SpanKeySoap(
     WEBADM_HOST,

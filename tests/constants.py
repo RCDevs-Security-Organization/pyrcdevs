@@ -355,7 +355,7 @@ LIST_USER_ACCOUNT_LDAP_SLAPD = (
     "webadmdata",
     "usercertificate",
 )
-
+MAILSERVER = os.environ["MAILSERVER"]
 MSG_AUTH_SUCCESS = "Authentication success"
 MSG_ENTER_EMERGENCY_OTP = "Enter your EMERGENCY password"
 MSG_INVALID_AUTH_REQUEST = "Invalid authentication request"

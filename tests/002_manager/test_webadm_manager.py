@@ -1,24 +1,35 @@
 """This module implements tests for WebADM API Manager."""
 
 import base64
+import email
+import hashlib
+import imaplib
 import json
+import locale
 import re
-import requests
 import secrets
 import ssl
 import time
 from datetime import datetime, timedelta
+from email.message import Message
 from enum import Enum
 from io import BytesIO
-from PIL import Image
-from requests import Session, get
-from http.client import responses
+from typing import Tuple
+from unittest import skipIf
 
 import pytest
-from cffi.model import unknown_type
+import pytz
+import requests
+from cryptography import x509
+from cryptography.hazmat.backends import default_backend
+from PIL import Image
+from cryptography.hazmat.primitives import serialization, hashes
+from cryptography.hazmat.primitives.asymmetric import padding
+from requests import Session
 from requests.adapters import HTTPAdapter
 
 import pyrcdevs
+from M2Crypto import SMIME, X509, BIO
 from pyrcdevs import WebADMManager
 from pyrcdevs.constants import MSG_NOT_RIGHT_TYPE, REGEX_BASE64
 from pyrcdevs.manager import InternalError
@@ -26,39 +37,45 @@ from pyrcdevs.manager.Manager import InvalidParams
 from pyrcdevs.manager.WebADMManager import (
     AutoConfirmApplication,
     AutoConfirmExpiration,
+    ClientMode,
     ConfigObjectApplication,
     ConfigObjectType,
     EventLogApplication,
+    InventoryStatus,
+    LDAPSearchScope,
+    LDAPSyncObjectType,
     LicenseProduct,
     QRCodeFormat,
-    QRCodeSize,
     QRCodeMargin,
-    InventoryStatus,
+    QRCodeSize,
+    UnlockApplication,
 )
 from tests.constants import (
+    CA_CERT_PATH,
     CLUSTER_TYPE,
     DEFAULT_PASSWORD,
+    DICT_USER_OBJECTCLASS,
+    EXCEPTION_NOT_RIGHT_TYPE,
     GROUP_OBJECTCLASS,
     LDAP_BASE_DN,
     LIST_STATUS_SERVERS_KEYS,
     LIST_STATUS_WEB_TYPES,
+    LIST_USER_ACCOUNT_LDAP_AD,
+    LIST_USER_ACCOUNT_LDAP_SLAPD,
+    MAILSERVER,
     OPENOTP_PUSHID,
     OPENOTP_TOKENKEY,
     RANDOM_STRING,
     REGEX_LOGTIME_TIME,
     REGEX_PARAMETER_DN_NOT_STRING,
     REGEX_VERSION_NUMBER,
+    SMS_MOBILE,
     TESTER_NAME,
     USER_CERT_PATH,
     WEBADM_API_PASSWORD,
     WEBADM_API_USERNAME,
     WEBADM_BASE_DN,
     WEBADM_HOST,
-    LIST_USER_ACCOUNT_LDAP_AD,
-    LIST_USER_ACCOUNT_LDAP_SLAPD,
-    DICT_USER_OBJECTCLASS,
-    EXCEPTION_NOT_RIGHT_TYPE,
-    CA_CERT_PATH,
 )
 
 webadm_api_manager = WebADMManager(
@@ -83,6 +100,120 @@ class HostHeaderSSLAdapter(HTTPAdapter):
     def init_poolmanager(self, *args, **kwargs):
         kwargs["ssl_context"] = self.ssl_context
         return super().init_poolmanager(*args, **kwargs)
+
+
+def get_email_body(message: Message, encoding: str = "utf-8") -> list:
+    body_parts = []
+    if message.is_multipart():
+        for part in message.walk():
+            content_type = part.get_content_type()
+            content_disposition = str(part.get("Content-Disposition"))
+            content_attachment = part.get_payload(decode=True)
+            if content_type != "multipart/mixed":
+                body_parts.append(
+                    {
+                        "content_type": content_type,
+                        "content_disposition": content_disposition,
+                        "content_attachment": content_attachment,
+                    }
+                )
+    else:
+        content_type = message.get_content_type()
+        content_disposition = message.get_content_disposition()
+        content_attachment = message.get_payload(decode=True).decode(encoding)
+        body_parts.append(
+            {
+                "content_type": content_type,
+                "content_disposition": content_disposition,
+                "content_attachment": content_attachment,
+            }
+        )
+    return body_parts
+
+
+def get_mailbox_content(email_address: str):
+    with imaplib.IMAP4(MAILSERVER) as mailserver:
+        try:
+            status, messages = mailserver.login(email_address, "password")
+        except imaplib.IMAP4.error as imap_err:
+            print(f"Issue authenticating to email account ({email}): {str(imap_err)}")
+            return []
+        if status != "OK":
+            print(f"Issue authenticating to email account ({email}): {messages}")
+            return []
+        status, messages = mailserver.select("Inbox")
+        if status != "OK":
+            print(
+                f"Issue selecting Inbox mailbox for email account ({email}):\n{b'\n'.join(messages).decode()}"
+            )
+            return []
+        status, messages = mailserver.search(None, "ALL")
+        if status != "OK":
+            return []
+        mails = []
+        for num in messages[0].split():
+            status, data = mailserver.fetch(num, "(RFC822)")
+            if status != "OK":
+                continue
+            # noinspection PyUnresolvedReferences
+            message = email.message_from_bytes(data[0][1])
+            sender = message["From"]
+            to = message["To"]
+            body = get_email_body(message)
+            subject = message["Subject"]
+            date = message["Date"]
+            locale.setlocale(locale.LC_TIME, "en_US.UTF-8")
+            utc_timezone = pytz.timezone("Etc/UTC")
+            date_time = datetime.strptime(date, "%a, %d %b %Y %H:%M:%S %z")
+            date_time_utc = date_time.astimezone(utc_timezone)
+            otps = []
+            body_plain_text = [
+                a["content_attachment"]
+                for a in body
+                if a["content_type"] == "text/plain"
+            ]
+            if "Login" in subject:
+                otps = re.findall(r"(\d{6})", " ".join(body_plain_text))
+            self_links = []
+            if "Self-Registration" in subject:
+                self_links = re.findall(
+                    r"(https://.*/webapps/selfreg[^.]*)\.", " ".join(body_plain_text)
+                )
+            mail = {
+                "Date": date_time_utc,
+                "From": sender,
+                "To": to,
+                "subject": subject,
+                "body": body,
+            }
+            if len(otps) > 0:
+                mail["otps"] = otps
+            if len(self_links) > 0:
+                mail["self_links"] = self_links
+            mails.append(mail)
+    return mails
+
+
+def get_otp_and_email_body(
+    email_address: str, formatted_utc_now: datetime
+) -> Tuple[str, list]:
+    """
+    Return body and list of possible OTPs from first mailbox email having an older date than formatted_utc_now
+    :param str email_address: email address of mailbox
+    :param datetime.datetime formatted_utc_now:
+    :rtype Tuple[str, list]
+    :return: Tuple of body and list of possible OTPs
+    """
+    possible_otps = []
+    body = ""
+    email_messages = get_mailbox_content(email_address)
+    for message in email_messages:
+        message_date = message.get("Date")
+        if message_date > formatted_utc_now and "otps" in message:
+            possible_otps = message.get("otps")
+            body = message.get("body")
+            break
+    return body, possible_otps
 
 
 def get_random_uid_number():
@@ -1108,7 +1239,10 @@ def test_get_event_logs() -> None:
             f"CN=u_cp_allowed,{WEBADM_BASE_DN.lower().replace('ou=pyrcdevs,', '')}"
         )
     else:
-        user_w_auth = f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_cp_allowed,{WEBADM_BASE_DN.replace('OU=pyrcdevs,', '')}"
+        user_w_auth = (
+            f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_cp_allowed,"
+            f"{WEBADM_BASE_DN.replace('OU=pyrcdevs,', '')}"
+        )
 
     response = webadm_api_manager.get_event_logs(
         EventLogApplication.OPENOTP,
@@ -2335,7 +2469,9 @@ def test_remove_user_attrs() -> None:
     )
     values = list(response.values())
     assert len(values) == 1
-    assert values[0] == {tested_attribute: ["value1", "value2"]} or values[0] == {tested_attribute: ["value2", "value1"]}
+    assert values[0] == {tested_attribute: ["value1", "value2"]} or values[0] == {
+        tested_attribute: ["value2", "value1"]
+    }
 
     response = webadm_api_manager.remove_user_attrs(
         f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_5_n,ou=new_ou,{WEBADM_BASE_DN}",
@@ -2397,4 +2533,753 @@ def test_remove_ldap_object() -> None:
         webadm_api_manager.search_ldap_objects(
             f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_5_n,ou=new_ou,{WEBADM_BASE_DN}",
         )
-    assert str(excinfo) == f"<ExceptionInfo InternalError(\"LDAP container 'CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_5_n,ou=new_ou,{WEBADM_BASE_DN}' does not exist\") tblen=3>"
+    assert (
+        str(excinfo)
+        == f"<ExceptionInfo InternalError(\"LDAP container 'CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_5_n,"
+        f"ou=new_ou,{WEBADM_BASE_DN}' does not exist\") tblen=3>"
+    )
+
+
+def test_remove_user_certificate() -> None:
+    """
+    Test Remove_User_Certificate method.
+    """
+
+    with open(f"{USER_CERT_PATH}", "r") as f:
+        cert1 = "".join(f.readlines()).replace(
+            "-----END CERTIFICATE-----\n", "-----END CERTIFICATE-----"
+        )
+
+    with open(f"{USER_CERT_PATH}_2", "r") as f:
+        cert2 = "".join(f.readlines()).replace(
+            "-----END CERTIFICATE-----\n", "-----END CERTIFICATE-----"
+        )
+
+    with open(f"{USER_CERT_PATH}_3", "r") as f:
+        cert3 = "".join(f.readlines()).replace(
+            "-----END CERTIFICATE-----\n", "-----END CERTIFICATE-----"
+        )
+
+    _test_malformed_dns(webadm_api_manager.remove_user_certificate, 1, cert3)
+
+    # Test removing an unknown certificate
+    response = webadm_api_manager.remove_user_certificate(
+        f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}", cert3
+    )
+    assert not response
+
+    # Get current certificate of user
+    response = webadm_api_manager.get_user_certificates(
+        f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}".lower()
+    )
+    response.sort()
+    expected_certs = [cert1, cert2]
+    expected_certs.sort()
+    assert response == expected_certs
+
+    # Test removing certificate #2
+    response = webadm_api_manager.remove_user_certificate(
+        f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}", cert2
+    )
+    assert response
+
+    # Get current certificate of user
+    response = webadm_api_manager.get_user_certificates(
+        f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}".lower()
+    )
+    assert response == [cert1]
+
+
+def test_search_ldap_objects() -> None:
+    """
+    Test Search_LDAP_Objects method.
+    """
+
+    # Test get all object in root of pyrcdevs tests (without scope provided)
+    response = webadm_api_manager.search_ldap_objects(f"{WEBADM_BASE_DN}")
+    assert isinstance(response, dict)
+    list_keys = [k.lower() for k in response.keys()]
+    assert list_keys == [
+        WEBADM_BASE_DN.lower(),
+        f"cn=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}".lower(),
+        f"cn=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_2,{WEBADM_BASE_DN}".lower(),
+        f"cn=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_3,{WEBADM_BASE_DN}".lower(),
+        f"cn=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_4,{WEBADM_BASE_DN}".lower(),
+        f"cn=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_unact,{WEBADM_BASE_DN}".lower(),
+        f"cn=g_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}".lower(),
+        f"cn=g_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_2,{WEBADM_BASE_DN}".lower(),
+        f"ou=new_ou,{WEBADM_BASE_DN}".lower(),
+    ]
+
+    # Test with wrong scope type.
+    with pytest.raises(TypeError) as excinfo:
+        # noinspection PyTypeChecker
+        webadm_api_manager.search_ldap_objects(f"{WEBADM_BASE_DN}", scope="BASE")
+    assert (
+        str(excinfo)
+        == "<ExceptionInfo TypeError('scope type is not LDAPSearchScope') tblen=2>"
+    )
+
+    # Test get all object in root of pyrcdevs tests (with scope provided)
+    response = webadm_api_manager.search_ldap_objects(
+        f"{WEBADM_BASE_DN}", scope=LDAPSearchScope.SUB
+    )
+    assert isinstance(response, dict)
+    list_keys = [k.lower() for k in response.keys()]
+    assert list_keys == [
+        WEBADM_BASE_DN.lower(),
+        f"cn=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}".lower(),
+        f"cn=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_2,{WEBADM_BASE_DN}".lower(),
+        f"cn=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_3,{WEBADM_BASE_DN}".lower(),
+        f"cn=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_4,{WEBADM_BASE_DN}".lower(),
+        f"cn=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_unact,{WEBADM_BASE_DN}".lower(),
+        f"cn=g_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}".lower(),
+        f"cn=g_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_2,{WEBADM_BASE_DN}".lower(),
+        f"ou=new_ou,{WEBADM_BASE_DN}".lower(),
+    ]
+
+    # Test get only base
+    response = webadm_api_manager.search_ldap_objects(
+        f"{WEBADM_BASE_DN}", scope=LDAPSearchScope.BASE
+    )
+    assert isinstance(response, dict)
+    list_keys = [k.lower() for k in response.keys()]
+    assert list_keys == [
+        WEBADM_BASE_DN.lower(),
+    ]
+
+    # Test get only base
+    response = webadm_api_manager.search_ldap_objects(
+        f"{WEBADM_BASE_DN}", scope=LDAPSearchScope.ONE
+    )
+    assert isinstance(response, dict)
+    list_keys = [k.lower() for k in response.keys()]
+    list_keys.sort()
+    assert list_keys == [
+        f"cn=g_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}".lower(),
+        f"cn=g_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_2,{WEBADM_BASE_DN}".lower(),
+        f"cn=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}".lower(),
+        f"cn=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_2,{WEBADM_BASE_DN}".lower(),
+        f"cn=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_3,{WEBADM_BASE_DN}".lower(),
+        f"cn=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_4,{WEBADM_BASE_DN}".lower(),
+        f"cn=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_unact,{WEBADM_BASE_DN}".lower(),
+        f"ou=new_ou,{WEBADM_BASE_DN}".lower(),
+    ]
+
+    if CLUSTER_TYPE != "metadata":
+        # Test get only webadmaccount object
+        response = webadm_api_manager.search_ldap_objects(
+            f"{WEBADM_BASE_DN}",
+            scope=LDAPSearchScope.ONE,
+            filter_="(objectclass=webadmaccount)",
+        )
+        assert isinstance(response, dict)
+        list_keys = [k.lower() for k in response.keys()]
+        list_keys.sort()
+        assert list_keys == [
+            f"cn=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}".lower(),
+            f"cn=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_4,{WEBADM_BASE_DN}".lower(),
+        ]
+
+
+def check_email_is_received(from_, to, message, is_encrypted=False):
+    time.sleep(1)
+    email_messages = get_mailbox_content(to)
+    assert isinstance(email_messages, list)
+    assert len(email_messages) > 0
+    last_email = email_messages[-1]
+    assert isinstance(last_email, dict)
+
+    assert all(
+        prefix in last_email for prefix in ("Date", "From", "To", "body", "subject")
+    )
+    assert last_email["From"] == from_
+    assert last_email["To"] == to
+    assert last_email["subject"] == message
+    assert isinstance(last_email["body"], list)
+    if is_encrypted:
+        out = decrypt_smime_message(last_email)
+        assert out.startswith(b"Content-Type: multipart/mixed;")
+        body_parts = get_body_from_dec_msg(out)
+    else:
+        body_parts = last_email["body"]
+
+    plain_text_body = " ".join(
+        [
+            str(a["content_attachment"])
+            for a in body_parts
+            if "text/plain" in a["content_type"]
+        ]
+    )
+    assert message in plain_text_body
+    if " 3" in message or " 4" in message:
+        pdf = [
+            a["content_attachment"]
+            for a in body_parts
+            if "application/octet-stream" in a["content_type"]
+        ]
+        expected_sha512_hex = get_file_sha_hash("tests/test_file.pdf")
+        assert len(pdf) == 1
+        assert isinstance(pdf[0], bytes)
+        received_sha512_hex = get_file_sha_hash(pdf[0])
+        assert expected_sha512_hex == received_sha512_hex
+
+
+def get_body_from_dec_msg(out):
+    boundaries = re.compile(r" boundary=\"([^\"]*)\"").findall(out.decode())
+    assert len(boundaries) == 1
+    boundary = boundaries[0]
+    attachments = out.decode().split(f"--{boundary}")
+    body_parts = []
+    for attach in attachments:
+        if (
+                "Content-Type:" in attach
+                and "Content-Type: multipart/mixed;" not in attach
+        ):
+            details = attach.split("\r\n\r\n")
+            if "application/octet-stream" in details[0]:
+                content = base64.b64decode(details[1])
+            else:
+                content = details[1]
+            body_parts.append(
+                {
+                    "content_disposition": None,
+                    "content_type": details[0].replace("\r\n", ""),
+                    "content_attachment": content,
+                }
+            )
+    return body_parts
+
+
+def decrypt_smime_message(last_email):
+    smime = SMIME.SMIME()
+    smime.load_key("/tmp/user.key", "/tmp/user.crt")
+    assert len(last_email["body"]) == 1
+    attachment: str = last_email["body"][0]["content_attachment"]
+    attachment = attachment.replace(
+        'MIME-Version: 1.0\r\nContent-Disposition: attachment; filename="smime.p7m"\r\nContent-Type: '
+        'application/x-pkcs7-mime; smime-type=enveloped-data; name="smime.p7m"\r\n'
+        'Content-Transfer-Encoding: base64\r\n',
+        "-----BEGIN PKCS7-----",
+    )
+    attachment = attachment + "-----END PKCS7-----\r\n"
+    attachment = attachment.replace("\r\n\r\n", "")
+    p7_bio = BIO.MemoryBuffer(attachment.encode())
+    p7 = SMIME.load_pkcs7_bio(p7_bio)
+    out = smime.decrypt(p7)
+    return out
+
+
+def get_file_sha_hash(file: str | bytes, method=hashlib.sha512):
+    sha_hash_method = method()
+    if isinstance(file, str):
+        with open(file, "rb") as pdf_file:
+            for chunk in iter(lambda: pdf_file.read(4096), b""):
+                sha_hash_method.update(chunk)
+    else:
+        sha_hash_method.update(file)
+    return sha_hash_method.hexdigest()
+
+
+def test_send_mail() -> None:
+    """
+    Test Send_Mail method.
+    """
+
+    # For mssp, check this is not possible to send mail
+    if CLUSTER_TYPE == "mssp":
+        with pytest.raises(pyrcdevs.manager.Manager.InternalError) as excinfo:
+            webadm_api_manager.send_mail(
+                f"cp_allowed-{CLUSTER_TYPE.lower()}@testing.local", "Test", "Test"
+            )
+        assert (
+            str(excinfo)
+            == "<ExceptionInfo InternalError('Send email not allowed for tenants') tblen=3>"
+        )
+    else:
+        from_1 = f"noreply-{CLUSTER_TYPE.lower()}@testing.local"
+        from_2 = f"noreply-{CLUSTER_TYPE.lower()}_2@testing.local"
+        to = f"cp_allowed-{CLUSTER_TYPE.lower()}@testing.local"
+        message = f"test_send_mail({RANDOM_STRING}) {{}}"
+
+        # Test sending message using providing to, subject and body
+        response = webadm_api_manager.send_mail(
+            to, message.format(1), message.format(1)
+        )
+        assert response
+        check_email_is_received(from_1, to, message.format(1))
+
+        # Test sending message using providing from_, to, subject and body
+        response = webadm_api_manager.send_mail(
+            to,
+            message.format(2),
+            message.format(2),
+            from_=from_2,
+        )
+        assert response
+        check_email_is_received(from_2, to, message.format(2))
+
+        with open("tests/test_file.pdf", "rb") as test_file:
+            test_pdf = base64.b64encode(test_file.read())
+        attachments = [{"name": "test_file.pdf", "data": test_pdf.decode("utf-8")}]
+
+        response = webadm_api_manager.send_mail(
+            to,
+            message.format(3),
+            message.format(3),
+            from_=from_2,
+            attachments=attachments,
+        )
+        assert response
+        check_email_is_received(from_2, to, message.format(3))
+
+        with open(f"{USER_CERT_PATH}", "r") as f:
+            cert1 = "".join(f.readlines()).replace(
+                "-----END CERTIFICATE-----\n", "-----END CERTIFICATE-----"
+            )
+
+        response = webadm_api_manager.send_mail(
+            to,
+            message.format(4),
+            message.format(4),
+            from_=from_2,
+            attachments=attachments,
+            certificate=cert1,
+        )
+        assert response
+        check_email_is_received(from_2, to, message.format(4), True)
+
+
+def test_send_push() -> None:
+    """
+    Test Send_Push method.
+    """
+
+    push_id = base64.b64decode(OPENOTP_PUSHID).decode("utf-8")
+
+    # Test with wrong push ID format
+    with pytest.raises(pyrcdevs.manager.Manager.InternalError) as excinfo:
+        webadm_api_manager.send_push(RANDOM_STRING, OPENOTP_PUSHID)
+    assert (
+        str(excinfo)
+        == '<ExceptionInfo InternalError("Invalid device for push notification (bad format '
+        f"'{OPENOTP_PUSHID[:25]}...')\") tblen=3>"
+    )
+
+    # Test with unknown application ID
+    with pytest.raises(pyrcdevs.manager.Manager.InternalError) as excinfo:
+        webadm_api_manager.send_push(RANDOM_STRING, push_id)
+    assert (
+        str(excinfo)
+        == "<ExceptionInfo InternalError('Push message request failed (from service: internal error while calling "
+        "PUSH:SEND_SINGLE_PUSH)') tblen=3>"
+    )
+
+    # Test right application ID and push ID, but without options and data
+    with pytest.raises(pyrcdevs.manager.Manager.InternalError) as excinfo:
+        webadm_api_manager.send_push("token", push_id)
+    assert (
+        str(excinfo)
+        == "<ExceptionInfo InternalError('Push message request failed (from service: internal error while calling "
+        "PUSH:SEND_SINGLE_PUSH)') tblen=3>"
+    )
+
+    # Test right application ID and push ID, with options and data
+    response = webadm_api_manager.send_push(
+        "token",
+        push_id,
+        options={
+            "title": "Test",
+            "body": f"Received from OpenOTP at {CLUSTER_TYPE.upper()}",
+            "vibrate": 1,
+            "category": "auth",
+        },
+        data={
+            "version": 3,
+            "session": "GN8edu7CD0LAayVx",
+            "category": "auth",
+            "language": "DE",
+            "challenge": "b1f2bbf715f20290dacb30f0990eec45aed5d9b0",
+            "timestamp": "67d3f640",
+            "signature": "c0c1d4c6c0ab743923731464553afa8c41360fc3",
+            "client": "560537702ebb33204ed726860c0d5efe",
+            "timeout": 90,
+            "pinlength": 0,
+            "reqtime": 28,
+            "source": "175b2c756f8736934f8e153ab23d0212",
+            "location": "",
+            "endpoint": "3299ec2db609bb9c95f3f0d8f87053a5e5605a628dcafe2d"
+            "a2839bf833741a96da482202134a299e15bd2a80b1935b15",
+            "config": "374fd86e",
+        },
+    )
+    assert response
+
+    # TODO: a bug with timeout must be checked
+    """
+    # Test right application ID and push ID, with options and data, and a timeout
+    response = webadm_api_manager.send_push(
+        "token",
+        push_id,
+        options={
+            "title": "Test",
+            "body": f"Received from OpenOTP at {CLUSTER_TYPE.upper()}",
+            "vibrate": 1,
+            "category": "auth",
+        },
+        data={
+            "version": 3,
+            "session": "GN8edu7CD0LAayVx",
+            "category": "auth",
+            "language": "DE",
+            "challenge": "b1f2bbf715f20290dacb30f0990eec45aed5d9b0",
+            "timestamp": "67d3f640",
+            "signature": "c0c1d4c6c0ab743923731464553afa8c41360fc3",
+            "client": "560537702ebb33204ed726860c0d5efe",
+            "timeout": 90,
+            "pinlength": 0,
+            "reqtime": 28,
+            "source": "175b2c756f8736934f8e153ab23d0212",
+            "location": "",
+            "endpoint": "3299ec2db609bb9c95f3f0d8f87053a5e5605a628dcafe2
+            da2839bf833741a96da482202134a299e15bd2a80b1935b15",
+            "config": "374fd86e",
+        },
+        timeout="90",
+    )
+    assert response"""
+
+
+def test_set_user_password() -> None:
+    """
+    Test Set_User_Password method.
+    """
+
+    _test_malformed_dns(webadm_api_manager.set_user_password, 1, "Password123!")
+
+    response = webadm_api_manager.set_user_password(
+        f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}",
+        "Password321!",
+    )
+    assert response
+
+    response = webadm_api_manager.set_user_password(
+        f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}",
+        DEFAULT_PASSWORD,
+        False,
+    )
+    assert response
+
+
+def test_set_user_settings() -> None:
+    """
+    Test Set_User_Settings method.
+    """
+
+    # Test setting OpenOTP.LoginMode to LDAP
+    response = webadm_api_manager.set_user_settings(
+        f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}",
+        {"OpenOTP.LoginMode": "LDAP"},
+    )
+    assert response
+
+    response = webadm_api_manager.get_user_settings(
+        f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}",
+        ["OpenOTP.LoginMode"],
+    )
+    assert response == {
+        "OpenOTP.LoginMode": "LDAP",
+    }
+
+    # Test setting OpenOTP.LoginMode back to LDAPOTP
+    response = webadm_api_manager.set_user_settings(
+        f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}",
+        {"OpenOTP.LoginMode": "LDAPOTP"},
+    )
+    assert response
+
+    response = webadm_api_manager.get_user_settings(
+        f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}",
+        ["OpenOTP.LoginMode"],
+    )
+    assert response == {
+        "OpenOTP.LoginMode": "LDAPOTP",
+    }
+
+
+def test_sign_certificate_request() -> None:
+    """
+    Test Sign_Certificate_Request method.
+    """
+
+    with open("/tmp/csr.csr", "r") as csr_file:
+        csr = csr_file.read()
+
+    if CLUSTER_TYPE == "mssp":
+        # Test that certificate signing is not allowed for MSSP
+        with pytest.raises(pyrcdevs.manager.Manager.InternalError) as excinfo:
+            webadm_api_manager.sign_certificate_request(csr)
+        assert (
+            str(excinfo)
+            == "<ExceptionInfo InternalError('Certificate signing not allowed for tenants') tblen=3>"
+        )
+    else:
+        # Test with default expiration (1 year)
+        response = webadm_api_manager.sign_certificate_request(csr)
+        assert response
+
+        certificate = x509.load_pem_x509_certificate(
+            response.encode("utf-8"), backend=default_backend()
+        )
+        csr_object = x509.load_pem_x509_csr(
+            csr.encode("utf-8"), backend=default_backend()
+        )
+        assert certificate.subject == csr_object.subject
+        assert certificate.public_key() == csr_object.public_key()
+        assert (
+            round(
+                (
+                    certificate.not_valid_after_utc - certificate.not_valid_before_utc
+                ).total_seconds()
+            )
+            == 31536000
+        )
+
+        # Test with expiration to one day
+        response = webadm_api_manager.sign_certificate_request(csr, expires=1)
+        assert response
+
+        certificate = x509.load_pem_x509_certificate(
+            response.encode("utf-8"), backend=default_backend()
+        )
+        csr_object = x509.load_pem_x509_csr(
+            csr.encode("utf-8"), backend=default_backend()
+        )
+        assert certificate.subject == csr_object.subject
+        assert certificate.public_key() == csr_object.public_key()
+        assert (
+            round(
+                (
+                    certificate.not_valid_after_utc - certificate.not_valid_before_utc
+                ).total_seconds()
+            )
+            == 86400
+        )
+
+
+def test_unlock_application_access() -> None:
+    """
+    Test Unlock_Application_Access method.
+    """
+
+    # Test with bad type for application argument.
+    with pytest.raises(TypeError) as excinfo:
+        # noinspection PyTypeChecker
+        webadm_api_manager.unlock_application_access(
+            f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}",
+            "selfreg",
+            3600,
+        )  # NOSONAR
+    assert (
+        str(excinfo)
+        == "<ExceptionInfo TypeError('application type is not UnlockApplication') tblen=2>"
+    )
+
+    response = webadm_api_manager.unlock_application_access(
+        f"CN=u_{TESTER_NAME[:3]}_{CLUSTER_TYPE[:1]}_api_1,{WEBADM_BASE_DN}",
+        UnlockApplication.SELFREG,
+        3600,
+    )
+    assert response
+
+
+def test_update_inventory_item() -> None:
+    """
+    Test Update_Inventory_Item method.
+    """
+
+    # Test with bad type for status argument.
+    with pytest.raises(TypeError) as excinfo:
+        # noinspection PyTypeChecker
+        webadm_api_manager.update_inventory_items(
+            "OTP Token",
+            "151147490827268",
+            status="Valid",
+        )  # NOSONAR
+    assert str(excinfo) == EXCEPTION_NOT_RIGHT_TYPE.format("status", "InventoryStatus")
+
+    # Test updating unknown type
+    response = webadm_api_manager.update_inventory_items("Unknown type")
+    assert response == 0
+
+    # Test updating all OTP Token type to not active
+    response = webadm_api_manager.update_inventory_items("OTP Token", active=False)
+    assert response == 6
+
+    # Test updating OTP Token type as lost for only a specific reference
+    response = webadm_api_manager.update_inventory_items(
+        "OTP Token", filter_="151147490827268", status=InventoryStatus.LOST
+    )
+    assert response == 1
+
+    # Test updating OTP Token type as active and valid for only linked tokens
+    response = webadm_api_manager.update_inventory_items(
+        "OTP Token",
+        filter_="100000000000000001",
+        linked=True,
+        active=True,
+        status=InventoryStatus.VALID,
+    )
+    assert response == 1
+
+
+@pytest.mark.skip("Require SMS credit")
+def test_send_sms() -> None:
+    """
+    Test Send_SMS method.
+    """
+
+    response = webadm_api_manager.send_sms(SMS_MOBILE, "test")
+    assert response
+
+    response = webadm_api_manager.send_sms(SMS_MOBILE, "test", "from")
+    assert response
+
+
+def test_set_client_mode() -> None:
+    """
+    Test Set_Client_Mode method.
+    """
+
+    # Test with bad type for ClientMode argument.
+    with pytest.raises(TypeError) as excinfo:
+        # noinspection PyTypeChecker
+        webadm_api_manager.set_client_mode("Allowed_Addresses", 2)  # NOSONAR
+    assert (
+        str(excinfo)
+        == "<ExceptionInfo TypeError('mode type is not ClientMode') tblen=2>"
+    )
+
+    response = webadm_api_manager.set_client_mode(RANDOM_STRING, ClientMode.STEP_DOWN)
+    assert not response
+
+    response = webadm_api_manager.set_client_mode(
+        "Allowed_Addresses",
+        ClientMode.STEP_DOWN,
+        timeout=10,
+        group=False,
+        network=False,
+    )
+    assert response
+
+
+@skipIf(CLUSTER_TYPE != "mssp", "Only for MSSP")
+def test_sync_ldap_object() -> None:
+    """
+    Test Sync_LDAP_Object method.
+    """
+
+    # Creating sync OU
+    response = webadm_api_manager.create_ldap_object(
+        f"ou=sync,{WEBADM_BASE_DN}",
+        {"objectclass": ["organizationalunit"], "ou": "sync"},
+    )
+    assert response
+
+    # Test with bad type for LDAPSyncObjectType argument.
+    with pytest.raises(TypeError) as excinfo:
+        # noinspection PyTypeChecker
+        webadm_api_manager.sync_ldap_object(
+            "CN=testuser,CN=Users,DC=suptesting,DC=rcdevs,DC=com",
+            attrs={"uid": ["testuser"], "userpassword": ["password"]},
+            type_="user",
+            uuid="ec1484d3-66b6-44b7-825a-e3c1c39a8305",
+        )  # NOSONAR
+        assert (
+            str(excinfo)
+            == "<ExceptionInfo TypeError('type_ type is not LDAPSyncObjectType') tblen=2>"
+        )
+
+    response = webadm_api_manager.sync_ldap_object(
+        "CN=testuser,CN=Users,DC=suptesting,DC=rcdevs,DC=com",
+        attrs={"uid": ["testuser"], "userpassword": ["password"]},
+        type_=LDAPSyncObjectType.USER,
+        uuid="ec1484d3-66b6-44b7-825a-e3c1c39a8305",
+    )
+    assert response
+
+    response = webadm_api_manager.search_ldap_objects(
+        f"ou=sync,{WEBADM_BASE_DN}",
+        scope=LDAPSearchScope.ONE,
+        attrs=["cn"],
+    )
+    assert response == {
+        "cn=testuser,ou=sync,ou=pyrcdevs,ou=users": {"cn": ["testuser"]}
+    }
+
+    response = webadm_api_manager.sync_ldap_object(
+        "CN=testgroup,CN=Users,DC=suptesting,DC=rcdevs,DC=com",
+        attrs={"gid": ["testgroup"]},
+        type_=LDAPSyncObjectType.GROUP,
+        uuid="2dd5fade-c9f3-4766-8be5-21cf424b2c97",
+    )
+    assert response
+
+    response = webadm_api_manager.search_ldap_objects(
+        f"ou=sync,{WEBADM_BASE_DN}",
+        scope=LDAPSearchScope.ONE,
+        attrs=["cn"],
+    )
+    assert response == {
+        f"cn=testgroup,ou=sync,{WEBADM_BASE_DN}".lower(): {
+            "cn": [
+                "testgroup",
+            ],
+        },
+        f"cn=testuser,ou=sync,{WEBADM_BASE_DN}".lower(): {
+            "cn": [
+                "testuser",
+            ],
+        },
+    }
+
+
+@skipIf(CLUSTER_TYPE != "mssp", "Only for MSSP")
+def test_sync_ldap_delete() -> None:
+    """
+    Test Sync_LDAP_Delete method.
+    """
+
+    # Test deleting everything except testuser account
+    response = webadm_api_manager.sync_ldap_delete(
+        "CN=Users,DC=suptesting,DC=rcdevs,DC=com",
+        ["CN=testuser,CN=Users,DC=suptesting,DC=rcdevs,DC=com"],
+    )
+    assert response
+
+    response = webadm_api_manager.search_ldap_objects(
+        f"ou=sync,{WEBADM_BASE_DN}",
+        scope=LDAPSearchScope.ONE,
+        attrs=["cn"],
+    )
+    assert response == {
+        f"cn=testuser,ou=sync,{WEBADM_BASE_DN}".lower(): {
+            "cn": [
+                "testuser",
+            ],
+        },
+    }
+
+    # Test deleting everything
+    response = webadm_api_manager.sync_ldap_delete(
+        "CN=Users,DC=suptesting,DC=rcdevs,DC=com",
+        [""],
+    )
+    assert response
+
+    response = webadm_api_manager.search_ldap_objects(
+        f"ou=sync,{WEBADM_BASE_DN}",
+        scope=LDAPSearchScope.ONE,
+        attrs=["cn"],
+    )
+    assert response == []
