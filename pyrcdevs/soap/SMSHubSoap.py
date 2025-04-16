@@ -1,4 +1,6 @@
 """This module implements OpenOTP SOAP API."""
+
+import ssl
 from enum import Enum
 
 from pyrcdevs.soap.SOAP import SOAP
@@ -18,29 +20,39 @@ class SMSHubSoap(SOAP):
         self,
         host: str,
         port: int,
-        verify: bool | str = True,
         p12_file_path: str = None,
         p12_password: str = None,
         api_key: str = None,
         timeout: int = 30,
+        verify_mode: ssl.VerifyMode = ssl.CERT_REQUIRED,
+        ca_file: str | None = None,
     ) -> None:
         """
         Construct SMSHubSoap class.
 
         :param str host: path to the db file
         :param int port: listening port of OpenOTP server
-        :param bool|str verify: Either boolean (verify or not TLS certificate), or path (str) to
-        CA certificate
         :param str p12_file_path: path to pkcs12 file used when TLS client auth is required
         :param str p12_password: password of pkcs12 file
         :param str api_key: API key
         :param int timeout: timeout of connection
+        :param ssl.VerifyMode verify_mode: one of ssl.CERT_NONE, ssl.CERT_OPTIONAL or ssl.CERT_REQUIRED. Default to
+        ssl.CERT_REQUIRED
+        :param str | None ca_file: path to the CA file for validating server certificate
         """
         super().__init__(
-            host, verify, "smshub", port, p12_file_path, p12_password, api_key, timeout
+            host,
+            "smshub",
+            port,
+            p12_file_path,
+            p12_password,
+            api_key,
+            timeout,
+            verify_mode,
+            ca_file,
         )
 
-    def send(
+    async def send(
         self,
         username: str,
         password: str,
@@ -81,10 +93,10 @@ class SMSHubSoap(SOAP):
             params["client"] = client
         if source is not None:
             params["source"] = source
-        response = super().handle_api_soap_request("Send", params)
+        response = await super().handle_api_soap_request("Send", params)
         return response
 
-    def sign(
+    async def sign(
         self,
         username: str,
         password: str,
@@ -119,5 +131,5 @@ class SMSHubSoap(SOAP):
             params["client"] = client
         if source is not None:
             params["source"] = source
-        response = super().handle_api_soap_request("Sign", params)
+        response = await super().handle_api_soap_request("Sign", params)
         return response

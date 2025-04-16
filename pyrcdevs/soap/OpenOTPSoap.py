@@ -1,10 +1,10 @@
 """This module implements OpenOTP SOAP API."""
 
 import re
+import ssl
 from enum import Enum
 
-from pyrcdevs.constants import (MSG_NOT_RIGHT_TYPE, REGEX_BASE64,
-                                TYPE_BASE64_STRING)
+from pyrcdevs.constants import MSG_NOT_RIGHT_TYPE, REGEX_BASE64, TYPE_BASE64_STRING
 from pyrcdevs.soap.SOAP import SOAP
 
 
@@ -34,29 +34,39 @@ class OpenOTPSoap(SOAP):
         self,
         host: str,
         port: int = 8443,
-        verify: bool | str = True,
         p12_file_path: str = None,
         p12_password: str = None,
         api_key: str = None,
         timeout: int = 30,
+        verify_mode: ssl.VerifyMode = ssl.CERT_REQUIRED,
+        ca_file: str | None = None,
     ) -> None:
         """
         Construct OpenOTPSoap class.
 
         :param str host: path to the db file
         :param int port: listening port of OpenOTP server
-        :param bool|str verify: Either boolean (verify or not TLS certificate), or path (str) to
-        CA certificate
         :param str p12_file_path: path to pkcs12 file used when TLS client auth is required
         :param str p12_password: password of pkcs12 file
         :param str api_key: API key
         :param int timeout: timeout of connection
+        :param ssl.VerifyMode verify_mode: one of ssl.CERT_NONE, ssl.CERT_OPTIONAL or ssl.CERT_REQUIRED. Default to
+        ssl.CERT_REQUIRED
+        :param str | None ca_file: path to the CA file for validating server certificate
         """
         super().__init__(
-            host, verify, "openotp", port, p12_file_path, p12_password, api_key, timeout
+            host,
+            "openotp",
+            port,
+            p12_file_path,
+            p12_password,
+            api_key,
+            timeout,
+            verify_mode,
+            ca_file,
         )
 
-    def simple_login(
+    async def simple_login(
         self,
         username: str,
         domain: str = None,
@@ -104,10 +114,10 @@ class OpenOTPSoap(SOAP):
             params["retryId"] = retry_id
         if virtual is not None:
             params["virtual"] = virtual
-        response = super().handle_api_soap_request("SimpleLogin", params)
+        response = await super().handle_api_soap_request("SimpleLogin", params)
         return response
 
-    def normal_login(
+    async def normal_login(
         self,
         username: str,
         domain: str = None,
@@ -159,10 +169,10 @@ class OpenOTPSoap(SOAP):
             params["retryId"] = retry_id
         if virtual is not None:
             params["virtual"] = virtual
-        response = super().handle_api_soap_request("NormalLogin", params)
+        response = await super().handle_api_soap_request("NormalLogin", params)
         return response
 
-    def pki_login(
+    async def pki_login(
         self,
         certificate: str,
         client: str = None,
@@ -198,10 +208,10 @@ class OpenOTPSoap(SOAP):
             params["context"] = context
         if virtual is not None:
             params["virtual"] = virtual
-        response = super().handle_api_soap_request("PKILogin", params)
+        response = await super().handle_api_soap_request("PKILogin", params)
         return response
 
-    def challenge(
+    async def challenge(
         self,
         username: str,
         session: str,
@@ -221,10 +231,10 @@ class OpenOTPSoap(SOAP):
         params = {"username": username, "session": session, "otpPassword": otp_password}
         if domain is not None:
             params["domain"] = domain
-        response = super().handle_api_soap_request("Challenge", params)
+        response = await super().handle_api_soap_request("Challenge", params)
         return response
 
-    def normal_confirm(
+    async def normal_confirm(
         self,
         username: str,
         data: str,
@@ -280,10 +290,10 @@ class OpenOTPSoap(SOAP):
             if not re.compile(REGEX_BASE64).search(file):
                 raise TypeError(MSG_NOT_RIGHT_TYPE.format("file", TYPE_BASE64_STRING))
             params["file"] = file
-        response = super().handle_api_soap_request("NormalConfirm", params)
+        response = await super().handle_api_soap_request("NormalConfirm", params)
         return response
 
-    def confirm_qr_code(
+    async def confirm_qr_code(
         self,
         username: str,
         data: str,
@@ -351,10 +361,10 @@ class OpenOTPSoap(SOAP):
             if not re.compile(REGEX_BASE64).search(file):
                 raise TypeError(MSG_NOT_RIGHT_TYPE.format("file", TYPE_BASE64_STRING))
             params["file"] = file
-        response = super().handle_api_soap_request("ConfirmQRCode", params)
+        response = await super().handle_api_soap_request("ConfirmQRCode", params)
         return response
 
-    def check_confirm(
+    async def check_confirm(
         self,
         session: str,
     ) -> dict:
@@ -369,10 +379,10 @@ class OpenOTPSoap(SOAP):
         params = {
             "session": session,
         }
-        response = super().handle_api_soap_request("CheckConfirm", params)
+        response = await super().handle_api_soap_request("CheckConfirm", params)
         return response
 
-    def cancel_confirm(
+    async def cancel_confirm(
         self,
         session: str,
     ) -> dict:
@@ -386,10 +396,10 @@ class OpenOTPSoap(SOAP):
         params = {
             "session": session,
         }
-        response = super().handle_api_soap_request("CancelConfirm", params)
+        response = await super().handle_api_soap_request("CancelConfirm", params)
         return response
 
-    def touch_confirm(
+    async def touch_confirm(
         self,
         session: str,
         send_push: bool = None,
@@ -422,10 +432,10 @@ class OpenOTPSoap(SOAP):
             params["qrSizing"] = qr_sizing
         if qr_margin is not None:
             params["qrMargin"] = qr_margin
-        response = super().handle_api_soap_request("TouchConfirm", params)
+        response = await super().handle_api_soap_request("TouchConfirm", params)
         return response
 
-    def normal_sign(
+    async def normal_sign(
         self,
         username: str,
         data: str,
@@ -501,10 +511,10 @@ class OpenOTPSoap(SOAP):
             if not re.compile(REGEX_BASE64).search(file):
                 raise TypeError(MSG_NOT_RIGHT_TYPE.format("file", TYPE_BASE64_STRING))
             params["file"] = file
-        response = super().handle_api_soap_request("NormalSign", params)
+        response = await super().handle_api_soap_request("NormalSign", params)
         return response
 
-    def check_sign(
+    async def check_sign(
         self,
         session: str,
     ) -> dict:
@@ -519,10 +529,10 @@ class OpenOTPSoap(SOAP):
         params = {
             "session": session,
         }
-        response = super().handle_api_soap_request("CheckSign", params)
+        response = await super().handle_api_soap_request("CheckSign", params)
         return response
 
-    def cancel_sign(
+    async def cancel_sign(
         self,
         session: str,
     ) -> dict:
@@ -536,10 +546,10 @@ class OpenOTPSoap(SOAP):
         params = {
             "session": session,
         }
-        response = super().handle_api_soap_request("CancelSign", params)
+        response = await super().handle_api_soap_request("CancelSign", params)
         return response
 
-    def touch_sign(
+    async def touch_sign(
         self,
         session: str,
         send_push: bool = None,
@@ -572,10 +582,10 @@ class OpenOTPSoap(SOAP):
             params["qrSizing"] = qr_sizing
         if qr_margin is not None:
             params["qrMargin"] = qr_margin
-        response = super().handle_api_soap_request("TouchSign", params)
+        response = await super().handle_api_soap_request("TouchSign", params)
         return response
 
-    def sign_qr_code(
+    async def sign_qr_code(
         self,
         username: str,
         data: str,
@@ -651,20 +661,20 @@ class OpenOTPSoap(SOAP):
             if not re.compile(REGEX_BASE64).search(file):
                 raise TypeError(MSG_NOT_RIGHT_TYPE.format("file", TYPE_BASE64_STRING))
             params["file"] = file
-        response = super().handle_api_soap_request("SignQRCode", params)
+        response = await super().handle_api_soap_request("SignQRCode", params)
         return response
 
-    def list(self) -> dict:
+    async def list(self) -> dict:
         """
         This method sends a request for getting a list of pending and recently finished transactions or signatures.
 
         :return: a dictionary of the SOAP API response
         :rtype: dict
         """
-        response = super().handle_api_soap_request("List", {})
+        response = await super().handle_api_soap_request("List", {})
         return response
 
-    def seal(
+    async def seal(
         self,
         file: str,
         mode: SignatureMode = None,
@@ -698,10 +708,10 @@ class OpenOTPSoap(SOAP):
             params["source"] = source
         if settings is not None:
             params["settings"] = settings
-        response = super().handle_api_soap_request("Seal", params)
+        response = await super().handle_api_soap_request("Seal", params)
         return response
 
-    def start_badging(
+    async def start_badging(
         self,
         username: str,
         data: str,
@@ -738,10 +748,10 @@ class OpenOTPSoap(SOAP):
             params["settings"] = settings
         if virtual is not None:
             params["virtual"] = virtual
-        response = super().handle_api_soap_request("StartBadging", params)
+        response = await super().handle_api_soap_request("StartBadging", params)
         return response
 
-    def check_badging(
+    async def check_badging(
         self,
         username: str,
         domain: str = None,
@@ -775,5 +785,5 @@ class OpenOTPSoap(SOAP):
             params["source"] = source
         if settings is not None:
             params["settings"] = settings
-        response = super().handle_api_soap_request("CheckBadging", params)
+        response = await super().handle_api_soap_request("CheckBadging", params)
         return response

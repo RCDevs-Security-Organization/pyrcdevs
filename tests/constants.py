@@ -40,7 +40,7 @@ DICT_USER_OBJECTCLASS = {
     ],
 }
 
-EXCEPTION_NOT_RIGHT_TYPE = "<ExceptionInfo TypeError('{} parameter is not {}') tblen=2>"
+EXCEPTION_NOT_RIGHT_TYPE = "<ExceptionInfo TypeError('{} parameter is not {}')"
 
 GROUP_OBJECTCLASS = os.environ["GROUP_OBJECTCLASS"]
 
@@ -438,7 +438,7 @@ REGEX_MAX_RETRY = (
     r"12}>: Failed to establish a new connection: \[Errno 113\] No route to host'\)\)"
 )
 REGEX_PARAMETER_DN_NOT_STRING = (
-    "<ExceptionInfo InvalidParams('Parameter dn not String') tblen=3>"
+    "<ExceptionInfo InvalidParams('Parameter dn not String')"
 )
 REGEX_SESSION_FORMAT = r"^[a-zA-Z0-9]{16,17}$"
 REGEX_STATUS_RESPONSE = (

@@ -1,5 +1,5 @@
 """This module implements OpenOTP API Manager."""
-
+import ssl
 from enum import Enum
 from typing import Any
 
@@ -60,10 +60,11 @@ class OpenOTPManager(Manager):
         username: str,
         password: str,
         port: int = 443,
-        verify: bool | str = True,
         p12_file_path: str = None,
         p12_password: str = None,
         timeout: int = 30,
+        verify_mode: ssl.VerifyMode = ssl.CERT_REQUIRED,
+        ca_file: str | None = None,
     ) -> None:
         """
         Construct OpenOTPManager class.
@@ -72,16 +73,25 @@ class OpenOTPManager(Manager):
         :param str username: username for API authentication
         :param str password: password for API authentication
         :param int port: listening port of OpenOTP server
-        :param bool|str verify: Either boolean (verify or not TLS certificate), or path (str) to
-        CA certificate
         :param str p12_file_path: path to pkcs12 file used when TLS client auth is required
         :param str p12_password: password of pkcs12 file
+        :param ssl.VerifyMode verify_mode: one of ssl.CERT_NONE, ssl.CERT_OPTIONAL or ssl.CERT_REQUIRED. Default to
+        ssl.CERT_REQUIRED
+        :param str | None ca_file: path to the CA file for validating server certificate
         """
         super().__init__(
-            host, username, password, verify, p12_file_path, p12_password, timeout, port
+            host,
+            username,
+            password,
+            p12_file_path,
+            p12_password,
+            timeout,
+            port,
+            verify_mode,
+            ca_file,
         )
 
-    def appkey_fetch(self, dn) -> list:
+    async def appkey_fetch(self, dn) -> list:
         """
         Retrieve the Application Passwords.
 
@@ -92,10 +102,12 @@ class OpenOTPManager(Manager):
         :rtype: list
         """
         params = {"dn": dn}
-        response = super().handle_api_manager_request("OpenOTP.AppKey_Fetch", params)
+        response = await super().handle_api_manager_request(
+            "OpenOTP.AppKey_Fetch", params
+        )
         return response
 
-    def appkey_register(self, dn, length=None, expires=None) -> bool:
+    async def appkey_register(self, dn, length=None, expires=None) -> bool:
         """
         Register Application Passwords.
 
@@ -117,10 +129,12 @@ class OpenOTPManager(Manager):
             params["length"] = length
         if expires is not None:
             params["expires"] = expires
-        response = super().handle_api_manager_request("OpenOTP.AppKey_Register", params)
+        response = await super().handle_api_manager_request(
+            "OpenOTP.AppKey_Register", params
+        )
         return response
 
-    def appkey_unregister(self, dn) -> bool:
+    async def appkey_unregister(self, dn) -> bool:
         """
         Unregister the Application Passwords.
 
@@ -131,12 +145,12 @@ class OpenOTPManager(Manager):
         :rtype: bool
         """
         params = {"dn": dn}
-        response = super().handle_api_manager_request(
+        response = await super().handle_api_manager_request(
             "OpenOTP.AppKey_Unregister", params
         )
         return response
 
-    def block_check(self, dn) -> bool:
+    async def block_check(self, dn) -> bool:
         """
         Check if user account is blocked.
 
@@ -147,10 +161,12 @@ class OpenOTPManager(Manager):
         :rtype: bool
         """
         params = {"dn": dn}
-        response = super().handle_api_manager_request("OpenOTP.Block_Check", params)
+        response = await super().handle_api_manager_request(
+            "OpenOTP.Block_Check", params
+        )
         return response
 
-    def block_reset(self, dn) -> bool:
+    async def block_reset(self, dn) -> bool:
         """
         Unblock the user account.
 
@@ -161,10 +177,12 @@ class OpenOTPManager(Manager):
         :rtype: bool
         """
         params = {"dn": dn}
-        response = super().handle_api_manager_request("OpenOTP.Block_Reset", params)
+        response = await super().handle_api_manager_request(
+            "OpenOTP.Block_Reset", params
+        )
         return response
 
-    def block_start(self, dn, expires=None) -> bool:
+    async def block_start(self, dn, expires=None) -> bool:
         """
         Block the user account.
 
@@ -180,10 +198,12 @@ class OpenOTPManager(Manager):
         params = {"dn": dn}
         if expires is not None:
             params["expires"] = expires
-        response = super().handle_api_manager_request("OpenOTP.Block_Start", params)
+        response = await super().handle_api_manager_request(
+            "OpenOTP.Block_Start", params
+        )
         return response
 
-    def domain_report(
+    async def domain_report(
         self,
         domain,
         filter=None,
@@ -231,10 +251,12 @@ class OpenOTPManager(Manager):
             params["expire"] = expire
         if reset is not None:
             params["reset"] = reset
-        response = super().handle_api_manager_request("OpenOTP.Domain_Report", params)
+        response = await super().handle_api_manager_request(
+            "OpenOTP.Domain_Report", params
+        )
         return response
 
-    def emerg_register(self, dn, otp=None, expires=None, maxuse=None) -> Any:
+    async def emerg_register(self, dn, otp=None, expires=None, maxuse=None) -> Any:
         """
         Register an Emergency OTP.
 
@@ -259,10 +281,12 @@ class OpenOTPManager(Manager):
             params["expires"] = expires
         if maxuse is not None:
             params["maxuse"] = maxuse
-        response = super().handle_api_manager_request("OpenOTP.Emerg_Register", params)
+        response = await super().handle_api_manager_request(
+            "OpenOTP.Emerg_Register", params
+        )
         return response
 
-    def emerg_unregister(self, dn) -> bool:
+    async def emerg_unregister(self, dn) -> bool:
         """
         Unregister the Emergency OTP.
 
@@ -273,12 +297,12 @@ class OpenOTPManager(Manager):
         :rtype: bool
         """
         params = {"dn": dn}
-        response = super().handle_api_manager_request(
+        response = await super().handle_api_manager_request(
             "OpenOTP.Emerg_Unregister", params
         )
         return response
 
-    def expire_check(self, dn, id_=None) -> bool:
+    async def expire_check(self, dn, id_=None) -> bool:
         """
         Check if the Token has expired.
 
@@ -292,10 +316,12 @@ class OpenOTPManager(Manager):
         params = {"dn": dn}
         if id_ is not None:
             params["id"] = id_
-        response = super().handle_api_manager_request("OpenOTP.Expire_Check", params)
+        response = await super().handle_api_manager_request(
+            "OpenOTP.Expire_Check", params
+        )
         return response
 
-    def expire_reset(self, dn, id_=None) -> bool:
+    async def expire_reset(self, dn, id_=None) -> bool:
         """
         Unset the Token expiration.
 
@@ -311,10 +337,12 @@ class OpenOTPManager(Manager):
         params = {"dn": dn}
         if id_ is not None:
             params["id"] = id_
-        response = super().handle_api_manager_request("OpenOTP.Expire_Reset", params)
+        response = await super().handle_api_manager_request(
+            "OpenOTP.Expire_Reset", params
+        )
         return response
 
-    def expire_start(self, dn, expires=None, id_=None) -> bool:
+    async def expire_start(self, dn, expires=None, id_=None) -> bool:
         """
         Set the Token expiration.
 
@@ -334,10 +362,12 @@ class OpenOTPManager(Manager):
             params["expires"] = expires
         if id_ is not None:
             params["id"] = id_
-        response = super().handle_api_manager_request("OpenOTP.Expire_Start", params)
+        response = await super().handle_api_manager_request(
+            "OpenOTP.Expire_Start", params
+        )
         return response
 
-    def fido_challenge(self, username, domain, random, appid=None) -> str:
+    async def fido_challenge(self, username, domain, random, appid=None) -> str:
         """
         Get a FIDO registration challenge.
 
@@ -353,10 +383,12 @@ class OpenOTPManager(Manager):
         params = {"username": username, "domain": domain, "random": random}
         if appid is not None:
             params["appid"] = appid
-        response = super().handle_api_manager_request("OpenOTP.FIDO_Challenge", params)
+        response = await super().handle_api_manager_request(
+            "OpenOTP.FIDO_Challenge", params
+        )
         return response
 
-    def fido_disable(self, dn, id_=None) -> bool:
+    async def fido_disable(self, dn, id_=None) -> bool:
         """
         De-activate the Device.
 
@@ -368,10 +400,12 @@ class OpenOTPManager(Manager):
         params = {"dn": dn}
         if id_ is not None:
             params["id"] = id_
-        response = super().handle_api_manager_request("OpenOTP.FIDO_Disable", params)
+        response = await super().handle_api_manager_request(
+            "OpenOTP.FIDO_Disable", params
+        )
         return response
 
-    def fido_enable(self, dn, id_=None) -> bool:
+    async def fido_enable(self, dn, id_=None) -> bool:
         """
         Re-activate the Device.
 
@@ -383,10 +417,12 @@ class OpenOTPManager(Manager):
         params = {"dn": dn}
         if id_ is not None:
             params["id"] = id_
-        response = super().handle_api_manager_request("OpenOTP.FIDO_Enable", params)
+        response = await super().handle_api_manager_request(
+            "OpenOTP.FIDO_Enable", params
+        )
         return response
 
-    def fido_register(self, dn, response, random, id_=None, name=None) -> bool:
+    async def fido_register(self, dn, response, random, id_=None, name=None) -> bool:
         """
         Register an FIDO Device.
 
@@ -407,10 +443,12 @@ class OpenOTPManager(Manager):
             params["id"] = id_
         if name is not None:
             params["name"] = name
-        response = super().handle_api_manager_request("OpenOTP.FIDO_Register", params)
+        response = await super().handle_api_manager_request(
+            "OpenOTP.FIDO_Register", params
+        )
         return response
 
-    def fido_unregister(self, dn, id_=None) -> bool:
+    async def fido_unregister(self, dn, id_=None) -> bool:
         """
         Unregister a FIDO Device.
 
@@ -426,10 +464,12 @@ class OpenOTPManager(Manager):
         params = {"dn": dn}
         if id_ is not None:
             params["id"] = id_
-        response = super().handle_api_manager_request("OpenOTP.FIDO_Unregister", params)
+        response = await super().handle_api_manager_request(
+            "OpenOTP.FIDO_Unregister", params
+        )
         return response
 
-    def hotp_register(self, dn, key, state=None, session=None, id_=None) -> bool:
+    async def hotp_register(self, dn, key, state=None, session=None, id_=None) -> bool:
         """
         Register a HOTP Token.
 
@@ -457,10 +497,12 @@ class OpenOTPManager(Manager):
             params["session"] = session
         if id_ is not None:
             params["id"] = id_
-        response = super().handle_api_manager_request("OpenOTP.HOTP_Register", params)
+        response = await super().handle_api_manager_request(
+            "OpenOTP.HOTP_Register", params
+        )
         return response
 
-    def hotp_resync_counter(self, dn, counter, id_=None) -> bool:
+    async def hotp_resync_counter(self, dn, counter, id_=None) -> bool:
         """
         Resynchronize the HOTP Token with counter.
 
@@ -476,12 +518,12 @@ class OpenOTPManager(Manager):
         params = {"dn": dn, "counter": counter}
         if id_ is not None:
             params["id"] = id_
-        response = super().handle_api_manager_request(
+        response = await super().handle_api_manager_request(
             "OpenOTP.HOTP_Resync_Counter", params
         )
         return response
 
-    def hotp_resync_sequence(self, dn, otp1, otp2, id_=None) -> bool:
+    async def hotp_resync_sequence(self, dn, otp1, otp2, id_=None) -> bool:
         """
         Resynchronize the HOTP Token with OTPs.
 
@@ -498,12 +540,12 @@ class OpenOTPManager(Manager):
         params = {"dn": dn, "otp1": otp1, "otp2": otp2}
         if id_ is not None:
             params["id"] = id_
-        response = super().handle_api_manager_request(
+        response = await super().handle_api_manager_request(
             "OpenOTP.HOTP_Resync_Sequence", params
         )
         return response
 
-    def hotp_uri(
+    async def hotp_uri(
         self,
         name,
         key,
@@ -542,10 +584,10 @@ class OpenOTPManager(Manager):
             params["session"] = session
         if tinyurl is not None:
             params["tinyurl"] = tinyurl
-        response = super().handle_api_manager_request("OpenOTP.HOTP_URI", params)
+        response = await super().handle_api_manager_request("OpenOTP.HOTP_URI", params)
         return response
 
-    def hotp_verify(self, otp, key, length, state=None) -> Any:
+    async def hotp_verify(self, otp, key, length, state=None) -> Any:
         """
         Verify HOTP Password.
 
@@ -561,10 +603,12 @@ class OpenOTPManager(Manager):
         params = {"otp": otp, "key": key, "length": length}
         if state is not None:
             params["state"] = state
-        response = super().handle_api_manager_request("OpenOTP.HOTP_Verify", params)
+        response = await super().handle_api_manager_request(
+            "OpenOTP.HOTP_Verify", params
+        )
         return response
 
-    def inventory_register(self, dn, serial, id_=None, otp=None) -> bool:
+    async def inventory_register(self, dn, serial, id_=None, otp=None) -> bool:
         """
         Register an inventoried Token.
 
@@ -585,12 +629,12 @@ class OpenOTPManager(Manager):
             params["id"] = id_
         if otp is not None:
             params["otp"] = otp
-        response = super().handle_api_manager_request(
+        response = await super().handle_api_manager_request(
             "OpenOTP.Inventory_Register", params
         )
         return response
 
-    def list_fetch(self, dn) -> list:
+    async def list_fetch(self, dn) -> list:
         """
         Retrieve the OTP List.
 
@@ -599,10 +643,12 @@ class OpenOTPManager(Manager):
         :rtype: list
         """
         params = {"dn": dn}
-        response = super().handle_api_manager_request("OpenOTP.List_Fetch", params)
+        response = await super().handle_api_manager_request(
+            "OpenOTP.List_Fetch", params
+        )
         return response
 
-    def list_register(self, dn, size=None, algo=None) -> bool:
+    async def list_register(self, dn, size=None, algo=None) -> bool:
         """
         Register an OTP List.
 
@@ -625,10 +671,12 @@ class OpenOTPManager(Manager):
             params["size"] = size
         if algo is not None:
             params["algo"] = algo
-        response = super().handle_api_manager_request("OpenOTP.List_Register", params)
+        response = await super().handle_api_manager_request(
+            "OpenOTP.List_Register", params
+        )
         return response
 
-    def list_state(self, dn) -> int:
+    async def list_state(self, dn) -> int:
         """
         Get the number of remaining OTPs.
 
@@ -640,10 +688,12 @@ class OpenOTPManager(Manager):
         :rtype: int
         """
         params = {"dn": dn}
-        response = super().handle_api_manager_request("OpenOTP.List_State", params)
+        response = await super().handle_api_manager_request(
+            "OpenOTP.List_State", params
+        )
         return response
 
-    def list_unregister(self, dn) -> bool:
+    async def list_unregister(self, dn) -> bool:
         """
         Unregister the OTP List.
 
@@ -654,10 +704,12 @@ class OpenOTPManager(Manager):
         :rtype: bool
         """
         params = {"dn": dn}
-        response = super().handle_api_manager_request("OpenOTP.List_Unregister", params)
+        response = await super().handle_api_manager_request(
+            "OpenOTP.List_Unregister", params
+        )
         return response
 
-    def mobile_response(self, session) -> int:
+    async def mobile_response(self, session) -> int:
         """
         Get the Status of the mobile session.
 
@@ -671,10 +723,12 @@ class OpenOTPManager(Manager):
         :rtype: int
         """
         params = {"session": session}
-        response = super().handle_api_manager_request("OpenOTP.Mobile_Response", params)
+        response = await super().handle_api_manager_request(
+            "OpenOTP.Mobile_Response", params
+        )
         return response
 
-    def mobile_session(self, timeout, pincode=None, dn=None) -> Any:
+    async def mobile_session(self, timeout, pincode=None, dn=None) -> Any:
         """
         Start a mobile enrolment session.
 
@@ -692,10 +746,12 @@ class OpenOTPManager(Manager):
             params["dn"] = dn
         if pincode is not None:
             params["pincode"] = pincode
-        response = super().handle_api_manager_request("OpenOTP.Mobile_Session", params)
+        response = await super().handle_api_manager_request(
+            "OpenOTP.Mobile_Session", params
+        )
         return response
 
-    def ocra_register(self, dn, key, pin=None, state=None, id_=None) -> bool:
+    async def ocra_register(self, dn, key, pin=None, state=None, id_=None) -> bool:
         """
         Register an OCRA Token.
 
@@ -724,10 +780,12 @@ class OpenOTPManager(Manager):
             params["state"] = state
         if id_ is not None:
             params["id"] = id_
-        response = super().handle_api_manager_request("OpenOTP.OCRA_Register", params)
+        response = await super().handle_api_manager_request(
+            "OpenOTP.OCRA_Register", params
+        )
         return response
 
-    def ocra_resync_counter(self, dn, counter, id_=None) -> bool:
+    async def ocra_resync_counter(self, dn, counter, id_=None) -> bool:
         """
         Resynchronize the OCRA Token with counter.
 
@@ -743,12 +801,12 @@ class OpenOTPManager(Manager):
         params = {"dn": dn, "counter": counter}
         if id_ is not None:
             params["id"] = id_
-        response = super().handle_api_manager_request(
+        response = await super().handle_api_manager_request(
             "OpenOTP.OCRA_Resync_Counter", params
         )
         return response
 
-    def ocra_resync_sequence(self, dn, otp1, otp2, challenge, id_=None) -> bool:
+    async def ocra_resync_sequence(self, dn, otp1, otp2, challenge, id_=None) -> bool:
         """
         Resynchronize the OCRA Token with OTPs.
 
@@ -766,12 +824,12 @@ class OpenOTPManager(Manager):
         params = {"dn": dn, "otp1": otp1, "otp2": otp2, "challenge": challenge}
         if id_ is not None:
             params["id"] = id_
-        response = super().handle_api_manager_request(
+        response = await super().handle_api_manager_request(
             "OpenOTP.OCRA_Resync_Sequence", params
         )
         return response
 
-    def ocra_resync_time(self, dn, otp, challenge, id_=None) -> bool:
+    async def ocra_resync_time(self, dn, otp, challenge, id_=None) -> bool:
         """
         Resynchronize the OCRA Token with timestamp.
 
@@ -788,12 +846,12 @@ class OpenOTPManager(Manager):
         params = {"dn": dn, "otp": otp, "challenge": challenge}
         if id_ is not None:
             params["id"] = id_
-        response = super().handle_api_manager_request(
+        response = await super().handle_api_manager_request(
             "OpenOTP.OCRA_Resync_Time", params
         )
         return response
 
-    def ocra_setpin(self, dn, pin, id_=None) -> bool:
+    async def ocra_setpin(self, dn, pin, id_=None) -> bool:
         """
         Set PIN code for the OCRA Token.
 
@@ -809,10 +867,12 @@ class OpenOTPManager(Manager):
         params = {"dn": dn, "pin": pin}
         if id_ is not None:
             params["id"] = id_
-        response = super().handle_api_manager_request("OpenOTP.OCRA_Setpin", params)
+        response = await super().handle_api_manager_request(
+            "OpenOTP.OCRA_Setpin", params
+        )
         return response
 
-    def prefix_register(self, dn, prefix=None) -> Any:
+    async def prefix_register(self, dn, prefix=None) -> Any:
         """
         Register an OTP PIN Prefix.
 
@@ -829,10 +889,12 @@ class OpenOTPManager(Manager):
         params = {"dn": dn}
         if prefix is not None:
             params["prefix"] = prefix
-        response = super().handle_api_manager_request("OpenOTP.Prefix_Register", params)
+        response = await super().handle_api_manager_request(
+            "OpenOTP.Prefix_Register", params
+        )
         return response
 
-    def prefix_unregister(self, dn) -> bool:
+    async def prefix_unregister(self, dn) -> bool:
         """
         Unregister the OTP PIN Prefix.
 
@@ -843,12 +905,12 @@ class OpenOTPManager(Manager):
         :rtype: bool
         """
         params = {"dn": dn}
-        response = super().handle_api_manager_request(
+        response = await super().handle_api_manager_request(
             "OpenOTP.Prefix_Unregister", params
         )
         return response
 
-    def totp_register(self, dn, key, state=None, session=None, id_=None) -> bool:
+    async def totp_register(self, dn, key, state=None, session=None, id_=None) -> bool:
         """
         Register a TOTP Token.
 
@@ -875,10 +937,12 @@ class OpenOTPManager(Manager):
             params["session"] = session
         if id_ is not None:
             params["id"] = id_
-        response = super().handle_api_manager_request("OpenOTP.TOTP_Register", params)
+        response = await super().handle_api_manager_request(
+            "OpenOTP.TOTP_Register", params
+        )
         return response
 
-    def totp_resync(self, dn, otp, id_=None) -> bool:
+    async def totp_resync(self, dn, otp, id_=None) -> bool:
         """
         Resynchronize the TOTP Token.
 
@@ -895,10 +959,12 @@ class OpenOTPManager(Manager):
         params = {"dn": dn, "otp": otp}
         if id_ is not None:
             params["id"] = id_
-        response = super().handle_api_manager_request("OpenOTP.TOTP_Resync", params)
+        response = await super().handle_api_manager_request(
+            "OpenOTP.TOTP_Resync", params
+        )
         return response
 
-    def totp_uri(
+    async def totp_uri(
         self,
         name,
         key,
@@ -937,10 +1003,10 @@ class OpenOTPManager(Manager):
             params["session"] = session
         if tinyurl is not None:
             params["tinyurl"] = tinyurl
-        response = super().handle_api_manager_request("OpenOTP.TOTP_URI", params)
+        response = await super().handle_api_manager_request("OpenOTP.TOTP_URI", params)
         return response
 
-    def totp_verify(self, otp, key, length, period, state=None) -> str:
+    async def totp_verify(self, otp, key, length, period, state=None) -> str:
         """
         Verify TOTP Password.
 
@@ -958,10 +1024,12 @@ class OpenOTPManager(Manager):
         params = {"otp": otp, "key": key, "length": length, "period": period}
         if state is not None:
             params["state"] = state
-        response = super().handle_api_manager_request("OpenOTP.TOTP_Verify", params)
+        response = await super().handle_api_manager_request(
+            "OpenOTP.TOTP_Verify", params
+        )
         return response
 
-    def tmpkey_register(self, dn, password, expires=None) -> bool:
+    async def tmpkey_register(self, dn, password, expires=None) -> bool:
         """
         Register Temporary Password.
 
@@ -979,10 +1047,12 @@ class OpenOTPManager(Manager):
         params = {"dn": dn, "password": password}
         if expires is not None:
             params["expires"] = expires
-        response = super().handle_api_manager_request("OpenOTP.TmpKey_Register", params)
+        response = await super().handle_api_manager_request(
+            "OpenOTP.TmpKey_Register", params
+        )
         return response
 
-    def tmpkey_unregister(self, dn) -> bool:
+    async def tmpkey_unregister(self, dn) -> bool:
         """
         Unregister the Temporary Password.
 
@@ -993,12 +1063,12 @@ class OpenOTPManager(Manager):
         :rtype: bool
         """
         params = {"dn": dn}
-        response = super().handle_api_manager_request(
+        response = await super().handle_api_manager_request(
             "OpenOTP.TmpKey_Unregister", params
         )
         return response
 
-    def token_disable(self, dn, id_=None) -> bool:
+    async def token_disable(self, dn, id_=None) -> bool:
         """
         De-activate the Token.
 
@@ -1014,10 +1084,12 @@ class OpenOTPManager(Manager):
         params = {"dn": dn}
         if id_ is not None:
             params["id"] = id_
-        response = super().handle_api_manager_request("OpenOTP.Token_Disable", params)
+        response = await super().handle_api_manager_request(
+            "OpenOTP.Token_Disable", params
+        )
         return response
 
-    def token_enable(self, dn, id_=None) -> bool:
+    async def token_enable(self, dn, id_=None) -> bool:
         """
         Re-activate the Token.
 
@@ -1033,10 +1105,12 @@ class OpenOTPManager(Manager):
         params = {"dn": dn}
         if id_ is not None:
             params["id"] = id_
-        response = super().handle_api_manager_request("OpenOTP.Token_Enable", params)
+        response = await super().handle_api_manager_request(
+            "OpenOTP.Token_Enable", params
+        )
         return response
 
-    def token_unregister(self, dn, id_=None) -> bool:
+    async def token_unregister(self, dn, id_=None) -> bool:
         """
         Unregister an OTP Token.
 
@@ -1052,12 +1126,12 @@ class OpenOTPManager(Manager):
         params = {"dn": dn}
         if id_ is not None:
             params["id"] = id_
-        response = super().handle_api_manager_request(
+        response = await super().handle_api_manager_request(
             "OpenOTP.Token_Unregister", params
         )
         return response
 
-    def user_devices(self, dn) -> list:
+    async def user_devices(self, dn) -> list:
         """
         Get User FIDO Devices.
 
@@ -1068,10 +1142,12 @@ class OpenOTPManager(Manager):
         :rtype: list
         """
         params = {"dn": dn}
-        response = super().handle_api_manager_request("OpenOTP.User_Devices", params)
+        response = await super().handle_api_manager_request(
+            "OpenOTP.User_Devices", params
+        )
         return response
 
-    def user_methods(self, dn, active=None) -> list:
+    async def user_methods(self, dn, active=None) -> list:
         """
         Get User OTP Methods.
 
@@ -1086,10 +1162,12 @@ class OpenOTPManager(Manager):
         params = {"dn": dn}
         if active is not None:
             params["active"] = active
-        response = super().handle_api_manager_request("OpenOTP.User_Methods", params)
+        response = await super().handle_api_manager_request(
+            "OpenOTP.User_Methods", params
+        )
         return response
 
-    def user_report(
+    async def user_report(
         self, dn, token=None, u2f=None, block=None, expire=None, reset=None
     ) -> Any:
         """
@@ -1122,10 +1200,12 @@ class OpenOTPManager(Manager):
             params["expire"] = expire
         if reset is not None:
             params["reset"] = reset
-        response = super().handle_api_manager_request("OpenOTP.User_Report", params)
+        response = await super().handle_api_manager_request(
+            "OpenOTP.User_Report", params
+        )
         return response
 
-    def user_tokens(self, dn) -> list:
+    async def user_tokens(self, dn) -> list:
         """
         Get User OTP Tokens.
 
@@ -1136,10 +1216,12 @@ class OpenOTPManager(Manager):
         :rtype: list
         """
         params = {"dn": dn}
-        response = super().handle_api_manager_request("OpenOTP.User_Tokens", params)
+        response = await super().handle_api_manager_request(
+            "OpenOTP.User_Tokens", params
+        )
         return response
 
-    def voice_register(self, sample, model=None) -> Any:
+    async def voice_register(self, sample, model=None) -> Any:
         """
         Register Voice fingerprint.
 
@@ -1155,10 +1237,12 @@ class OpenOTPManager(Manager):
         params = {"sample": sample}
         if model is not None:
             params["model"] = model
-        response = super().handle_api_manager_request("OpenOTP.Voice_Register", params)
+        response = await super().handle_api_manager_request(
+            "OpenOTP.Voice_Register", params
+        )
         return response
 
-    def yubicloud_register(self, dn, otp, id_=None) -> bool:
+    async def yubicloud_register(self, dn, otp, id_=None) -> bool:
         """
         Register a Yubikey with YubiCloud.
 
@@ -1175,12 +1259,12 @@ class OpenOTPManager(Manager):
         params = {"dn": dn, "otp": otp}
         if id_ is not None:
             params["id"] = id_
-        response = super().handle_api_manager_request(
+        response = await super().handle_api_manager_request(
             "OpenOTP.Yubicloud_Register", params
         )
         return response
 
-    def yubikey_locate(self, otp, dn) -> int:
+    async def yubikey_locate(self, otp, dn) -> int:
         """
         Locate the Yubikey Token.
 
@@ -1192,10 +1276,14 @@ class OpenOTPManager(Manager):
         :rtype: int
         """
         params = {"dn": dn, "otp": otp}
-        response = super().handle_api_manager_request("OpenOTP.Yubikey_Locate", params)
+        response = await super().handle_api_manager_request(
+            "OpenOTP.Yubikey_Locate", params
+        )
         return response
 
-    def yubikey_register(self, dn, key, secret, public, state=None, id_=None) -> bool:
+    async def yubikey_register(
+        self, dn, key, secret, public, state=None, id_=None
+    ) -> bool:
         """
         Register a Yubikey Token.
 
@@ -1220,12 +1308,12 @@ class OpenOTPManager(Manager):
             params["state"] = state
         if id_ is not None:
             params["id"] = id_
-        response = super().handle_api_manager_request(
+        response = await super().handle_api_manager_request(
             "OpenOTP.Yubikey_Register", params
         )
         return response
 
-    def yubikey_reset(self, dn, id_=None) -> bool:
+    async def yubikey_reset(self, dn, id_=None) -> bool:
         """
         Reset the Yubikey Token.
 
@@ -1239,7 +1327,7 @@ class OpenOTPManager(Manager):
         params = {"dn": dn}
         if id_ is not None:
             params["id"] = id_
-        response = super().handle_api_manager_request(
+        response = await super().handle_api_manager_request(
             "OpenOTPManager.Yubikey_Reset", params
         )
         return response

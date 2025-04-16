@@ -1,10 +1,9 @@
 """This module implements SpanKey API Manager."""
-
+import ssl
 from enum import Enum
 from typing import Any
 
-from pyrcdevs.constants import (MSG_EXPIRES_POSSIBLE_VALUES,
-                                MSG_MAXUSE_POSSIBLE_VALUES)
+from pyrcdevs.constants import MSG_EXPIRES_POSSIBLE_VALUES, MSG_MAXUSE_POSSIBLE_VALUES
 from pyrcdevs.manager.Manager import Manager
 
 
@@ -43,10 +42,11 @@ class SpanKeyManager(Manager):
         username: str,
         password: str,
         port: int = 443,
-        verify: bool | str = True,
         p12_file_path: str = None,
         p12_password: str = None,
         timeout: int = 30,
+        verify_mode: ssl.VerifyMode = ssl.CERT_REQUIRED,
+        ca_file: str | None = None,
     ) -> None:
         """
         Construct SpanKey class.
@@ -55,16 +55,25 @@ class SpanKeyManager(Manager):
         :param str username: username for API authentication
         :param str password: password for API authentication
         :param int port: listening port of WebADM server
-        :param bool|str verify: Either boolean (verify or not TLS certificate), or path (str) to
-        CA certificate
         :param str p12_file_path: path to pkcs12 file used when TLS client auth is required
         :param str p12_password: password of pkcs12 file
+        :param ssl.VerifyMode verify_mode: one of ssl.CERT_NONE, ssl.CERT_OPTIONAL or ssl.CERT_REQUIRED. Default to
+        ssl.CERT_REQUIRED
+        :param str | None ca_file: path to the CA file for validating server certificate
         """
         super().__init__(
-            host, username, password, verify, p12_file_path, p12_password, timeout, port
+            host,
+            username,
+            password,
+            p12_file_path,
+            p12_password,
+            timeout,
+            port,
+            verify_mode,
+            ca_file,
         )
 
-    def key_register(self, dn, type_, size=None, expires=None, maxuse=None) -> Any:
+    async def key_register(self, dn, type_, size=None, expires=None, maxuse=None) -> Any:
         """
         Generate a SSH key pair and registers the public key on the user account.
 
@@ -91,10 +100,12 @@ class SpanKeyManager(Manager):
             params["expires"] = expires
         if maxuse is not None:
             params["maxuse"] = maxuse
-        response = super().handle_api_manager_request("SpanKey.Key_Register", params)
+        response = await super().handle_api_manager_request(
+            "SpanKey.Key_Register", params
+        )
         return response
 
-    def fido_challenge(self, username, domain, random, appid=None) -> Any:
+    async def fido_challenge(self, username, domain, random, appid=None) -> Any:
         """
         Return a JSON-encoded FIDO registration challenge.
 
@@ -108,10 +119,12 @@ class SpanKeyManager(Manager):
         params = {"username": username, "domain": domain, "random": random}
         if appid is not None:
             params["appid"] = appid
-        response = super().handle_api_manager_request("SpanKey.FIDO_Challenge", params)
+        response = await super().handle_api_manager_request(
+            "SpanKey.FIDO_Challenge", params
+        )
         return response
 
-    def fido_register(self, dn, response, random) -> bool:
+    async def fido_register(self, dn, response, random) -> bool:
         """
         Register a FIDO device.
 
@@ -122,10 +135,12 @@ class SpanKeyManager(Manager):
         :rtype: bool
         """
         params = {"dn": dn, "response": response, "random": random}
-        response = super().handle_api_manager_request("SpanKey.FIDO_Register", params)
+        response = await super().handle_api_manager_request(
+            "SpanKey.FIDO_Register", params
+        )
         return response
 
-    def key_export(self, privkey, format_=None, password=None) -> Any:
+    async def key_export(self, privkey, format_=None, password=None) -> Any:
         """
         Export the generated PEM-encoded private key for use with OpenSSH or PuTTY.
 
@@ -142,10 +157,12 @@ class SpanKeyManager(Manager):
             params["format"] = format_.value
         if password is not None:
             params["password"] = password
-        response = super().handle_api_manager_request("SpanKey.Key_Export", params)
+        response = await super().handle_api_manager_request(
+            "SpanKey.Key_Export", params
+        )
         return response
 
-    def key_import(self, dn, pubkey, expires=None, maxuse=None) -> bool:
+    async def key_import(self, dn, pubkey, expires=None, maxuse=None) -> bool:
         """
         Import RSA public keys.
 
@@ -167,10 +184,12 @@ class SpanKeyManager(Manager):
             params["expires"] = expires
         if maxuse is not None:
             params["maxuse"] = maxuse
-        response = super().handle_api_manager_request("SpanKey.Key_Import", params)
+        response = await super().handle_api_manager_request(
+            "SpanKey.Key_Import", params
+        )
         return response
 
-    def key_restrict(self, dn, expires=None, maxuse=None) -> bool:
+    async def key_restrict(self, dn, expires=None, maxuse=None) -> bool:
         """
         Change or remove the expiration or max use for the registered public key.
 
@@ -189,10 +208,12 @@ class SpanKeyManager(Manager):
             params["expires"] = expires
         if maxuse is not None:
             params["maxuse"] = maxuse
-        response = super().handle_api_manager_request("SpanKey.Key_Restrict", params)
+        response = await super().handle_api_manager_request(
+            "SpanKey.Key_Restrict", params
+        )
         return response
 
-    def key_unregister(self, dn) -> bool:
+    async def key_unregister(self, dn) -> bool:
         """
         Unregister a public key from user account.
 
@@ -201,10 +222,12 @@ class SpanKeyManager(Manager):
         :rtype: bool
         """
         params = {"dn": dn}
-        response = super().handle_api_manager_request("SpanKey.Key_Unregister", params)
+        response = await super().handle_api_manager_request(
+            "SpanKey.Key_Unregister", params
+        )
         return response
 
-    def piv_register(self, dn, serial) -> bool:
+    async def piv_register(self, dn, serial) -> bool:
         """
         Register an inventoried PIV public key on the user account.
 
@@ -214,5 +237,7 @@ class SpanKeyManager(Manager):
         :rtype: bool
         """
         params = {"dn": dn, "serial": serial}
-        response = super().handle_api_manager_request("SpanKey.PIV_Register", params)
+        response = await super().handle_api_manager_request(
+            "SpanKey.PIV_Register", params
+        )
         return response

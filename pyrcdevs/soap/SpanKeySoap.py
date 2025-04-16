@@ -1,6 +1,7 @@
 """This module implements SpanKey SOAP API."""
 
 import re
+import ssl
 from enum import Enum
 
 from pyrcdevs.constants import KEY_NS2_MAP, REGEX_BASE64
@@ -39,29 +40,39 @@ class SpanKeySoap(SOAP):
         self,
         host: str,
         port: int,
-        verify: bool | str = True,
         p12_file_path: str = None,
         p12_password: str = None,
         api_key: str = None,
         timeout: int = 30,
+        verify_mode: ssl.VerifyMode = ssl.CERT_REQUIRED,
+        ca_file: str | None = None,
     ) -> None:
         """
         Construct SpanKeySoap class.
 
         :param str host: path to the db file
         :param int port: listening port of OpenOTP server
-        :param bool|str verify: Either boolean (verify or not TLS certificate), or path (str) to
-        CA certificate
         :param str p12_file_path: path to pkcs12 file used when TLS client auth is required
         :param str p12_password: password of pkcs12 file
         :param str api_key: API key
         :param int timeout: timeout of connection
+        :param ssl.VerifyMode verify_mode: one of ssl.CERT_NONE, ssl.CERT_OPTIONAL or ssl.CERT_REQUIRED. Default to
+        ssl.CERT_REQUIRED
+        :param str | None ca_file: path to the CA file for validating server certificate
         """
         super().__init__(
-            host, verify, "spankey", port, p12_file_path, p12_password, api_key, timeout
+            host,
+            "spankey",
+            port,
+            p12_file_path,
+            p12_password,
+            api_key,
+            timeout,
+            verify_mode,
+            ca_file,
         )
 
-    def nss_list(
+    async def nss_list(
         self,
         database: NSSDatabaseType,
         domain: str = None,
@@ -87,7 +98,7 @@ class SpanKeySoap(SOAP):
             params["client"] = client
         if source is not None:
             params["source"] = source
-        response = super().handle_api_soap_request("NSSList", params)
+        response = await super().handle_api_soap_request("NSSList", params)
 
         if (
             "data" not in response
@@ -99,7 +110,7 @@ class SpanKeySoap(SOAP):
             reconstruct_nss_data(response)
         return response
 
-    def nss_info(
+    async def nss_info(
         self,
         database: NSSDatabaseType,
         domain: str = None,
@@ -133,14 +144,14 @@ class SpanKeySoap(SOAP):
             params["client"] = client
         if source is not None:
             params["source"] = source
-        response = super().handle_api_soap_request("NSSInfo", params)
+        response = await super().handle_api_soap_request("NSSInfo", params)
         if "data" not in response or not response["data"]:
             return response
 
         reconstruct_nss_data(response)
         return response
 
-    def authorized_keys(
+    async def authorized_keys(
         self,
         username: str,
         domain: str = None,
@@ -168,10 +179,10 @@ class SpanKeySoap(SOAP):
             params["source"] = source
         if settings is not None:
             params["settings"] = settings
-        response = super().handle_api_soap_request("AuthorizedKeys", params)
+        response = await super().handle_api_soap_request("AuthorizedKeys", params)
         return response
 
-    def recovery_keys(
+    async def recovery_keys(
         self,
         client: str = None,
         source: str = None,
@@ -187,10 +198,10 @@ class SpanKeySoap(SOAP):
         params = {"client": client}
         if source is not None:
             params["source"] = source
-        response = super().handle_api_soap_request("RecoveryKeys", params)
+        response = await super().handle_api_soap_request("RecoveryKeys", params)
         return response
 
-    def sudoers(
+    async def sudoers(
         self,
         username: str,
         domain: str = None,
@@ -214,10 +225,10 @@ class SpanKeySoap(SOAP):
             params["client"] = client
         if source is not None:
             params["source"] = source
-        response = super().handle_api_soap_request("Sudoers", params)
+        response = await super().handle_api_soap_request("Sudoers", params)
         return response
 
-    def session_start(
+    async def session_start(
         self,
         username: str,
         identity: str = None,
@@ -257,10 +268,10 @@ class SpanKeySoap(SOAP):
             params["client"] = client
         if source is not None:
             params["source"] = source
-        response = super().handle_api_soap_request("SessionStart", params)
+        response = await super().handle_api_soap_request("SessionStart", params)
         return response
 
-    def session_update(
+    async def session_update(
         self,
         session: str,
         stop: bool = None,
@@ -288,10 +299,10 @@ class SpanKeySoap(SOAP):
             if not re.compile(REGEX_BASE64).search(logs):
                 raise TypeError("logs parameter is not base64")
             params["logs"] = logs
-        response = super().handle_api_soap_request("SessionUpdate", params)
+        response = await super().handle_api_soap_request("SessionUpdate", params)
         return response
 
-    def session_login(
+    async def session_login(
         self,
         session: str,
         password: str = None,
@@ -304,9 +315,9 @@ class SpanKeySoap(SOAP):
         :return: a dictionary including information on authentication
         :rtype: dict
         """
-        return self.authenticate_user("SessionLogin", session, password)
+        return await self.authenticate_user("SessionLogin", session, password)
 
-    def session_unlock(
+    async def session_unlock(
         self,
         session: str,
         password: str = None,
@@ -319,9 +330,9 @@ class SpanKeySoap(SOAP):
         :return: a dictionary including information on authentication
         :rtype: dict
         """
-        return self.authenticate_user("SessionUnlock", session, password)
+        return await self.authenticate_user("SessionUnlock", session, password)
 
-    def authenticate_user(self, method, session, password):
+    async def authenticate_user(self, method, session, password):
         """
         This request makes a spankey authentication of a session.
 
@@ -334,10 +345,10 @@ class SpanKeySoap(SOAP):
         params = {"session": session}
         if password is not None:
             params["password"] = password
-        response = super().handle_api_soap_request(method, params)
+        response = await super().handle_api_soap_request(method, params)
         return response
 
-    def password_change(
+    async def password_change(
         self,
         session: str,
         old_password: str = None,
@@ -357,5 +368,5 @@ class SpanKeySoap(SOAP):
             "oldPassword": old_password,
             "newPassword": new_password,
         }
-        response = super().handle_api_soap_request("PasswordChange", params)
+        response = await super().handle_api_soap_request("PasswordChange", params)
         return response

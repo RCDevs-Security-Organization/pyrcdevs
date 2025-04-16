@@ -10,9 +10,8 @@ documentation = "https://docs.rcdevs.com/"
 
 [tool.poetry.dependencies]
 python = "^3.10"
-requests = "^2.32.3"
-requests-pkcs12 = "^1.25"
 xmltodict = "^0.14.2"
+aiohttp = "^3.11.16"
 
 [tool.poetry.group.test.dependencies]
 pytest = "^8.3.4"
@@ -85,10 +84,14 @@ set_env =
   VIRTUALENV_DISCOVERY = pyenv
   PYTHONPATH = ./tests:.
 deps =
+    aiohttp
     pytest
     pytest-env
     coverage
     virtualenv-pyenv
+    m2crypto
+    pillow
+    pytz
     python-ldap
     xmltodict
 """
