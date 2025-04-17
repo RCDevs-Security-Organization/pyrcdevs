@@ -2233,10 +2233,13 @@ def test_import_inventory_item() -> None:
                 },
             )
         )
-    assert "Duplicate entry 'OTP Token-151147490827268' for key 'Inventory.PRIMARY'\")" in str(
-        excinfo
-    ) or 'SQL query error: ERROR: duplicate key value violates unique constraint "Inventory_pkey' in str(
-        excinfo
+    assert (
+        "Duplicate entry 'OTP Token-151147490827268' for key 'Inventory.PRIMARY'\")"
+        in str(excinfo)
+        or "Duplicate entry 'OTP Token-151147490827268' for key 'PRIMARY'\")"
+        in str(excinfo)
+        or 'SQL query error: ERROR: duplicate key value violates unique constraint "Inventory_pkey'
+        in str(excinfo)
     )
 
     # Test importing a yubikey with status to expired
