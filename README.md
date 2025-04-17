@@ -7,12 +7,19 @@
 ### Example (requesting Server_Status method)
 
 ```python
+import ssl
+import asyncio
 from pyrcdevs import WebADMManager
 
 webadm_manager_api = WebADMManager(
-    "my_webadm_host_or_ip", "UserDomain\\api_username", "api_password", verify="/path/to/ca_file.crt"
+    "my_webadm_host_or_ip", 
+    "UserDomain\\api_username", 
+    "api_password", 
+    verify_mode=ssl.CERT_REQUIRED, 
+    ca_file="/path/to/ca_file.crt"
 )
-server_status_response = webadm_manager_api.server_status(servers=True, websrvs=True, webapps=True)
+server_status_response = asyncio.run(webadm_manager_api.server_status(servers=True, websrvs=True, webapps=True))
+
 ```
 
 Output is:
@@ -24,30 +31,40 @@ Output is:
 TLS client authentication may be required if your WebADM server has the `manager_auth` setting configured to `PKI` in `/opt/webadm/conf/webadm.conf` file.
 
 In this case, you can set the p12_file and p12_password options when instantiating the WebADM object:
+
 ```python
+import ssl
+import asyncio
 from pyrcdevs import WebADMManager
 
 webadm_manager_api = WebADMManager(
-    "my_webadm_host_or_ip", 
-    "UserDomain\\api_username", 
-    "api_password", 
-    verify="/path/to/ca_file.crt",
-    p12_file_path="/path/to/p12_file.p12",
-    p12_password="p12_PasSW0rd"
+    "my_webadm_host_or_ip",
+    "UserDomain\\api_username",
+    "api_password",
+    verify_mode=ssl.CERT_REQUIRED, 
+    ca_file="/path/to/ca_file.crt",
+    p12_file_path = "/path/to/p12_file.p12",
+    p12_password = "p12_PasSW0rd"
 )
-server_status_response = webadm_manager_api.server_status()
+server_status_response = asyncio.run(webadm_manager_api.server_status())
+
 ```
 
 ## SOAP API
 ### Example (requesting openotpNormalLogin method)
 
 ```python
+import ssl
+import asyncio
 from pyrcdevs import OpenOTPSoap
 
 openotp_soap_api = OpenOTPSoap(
-    "my_webadm_host_or_ip", verify="/path/to/ca_file.crt"
+    "my_webadm_host_or_ip", 
+    verify_mode=ssl.CERT_REQUIRED, 
+    ca_file="/path/to/ca_file.crt"
 )
-response = openotp_soap_api.normal_login("testuser1", ldap_password="password", otp_password="123456")
+response = asyncio.run(openotp_soap_api.normal_login("testuser1", ldap_password="password", otp_password="123456"))
+
 ```
 
 Output is:
@@ -62,29 +79,38 @@ corresponding web service.
 #### Client certificate
 For client certiticate authentication, you can set the p12_file and p12_password options when instantiating the 
 OpenOTPSoap object:
+
 ```python
+import ssl
+import asyncio
 from pyrcdevs import OpenOTPSoap
 
 openotp_soap_api = OpenOTPSoap(
-    "my_webadm_host_or_ip", 
-    verify="/path/to/ca_file.crt",
-    p12_file_path="/path/to/p12_file.p12",
-    p12_password="p12_PasSW0rd"
+    "my_webadm_host_or_ip",
+    verify_mode=ssl.CERT_REQUIRED, 
+    ca_file="/path/to/ca_file.crt",
+    p12_file_path = "/path/to/p12_file.p12",
+    p12_password = "p12_PasSW0rd"
 )
-response = openotp_soap_api.normal_login("testuser1", ldap_password="password", otp_password="123456")
+response = asyncio.run(openotp_soap_api.normal_login("testuser1", ldap_password="password", otp_password="123456"))
+
 ```
 
 #### API key
 For API key authentication, you can set the api_key parameter when instantiating the OpenOTPSoap object:
 ```python
+import ssl
+import asyncio
 from pyrcdevs import OpenOTPSoap
 
 openotp_soap_api = OpenOTPSoap(
     "my_webadm_host_or_ip", 
-    verify="/path/to/ca_file.crt",
+    verify_mode=ssl.CERT_REQUIRED, 
+    ca_file="/path/to/ca_file.crt",
     api_key="5860687476061196336_d788fd99ea4868f35c3b5e21ada3920b9501bb2c",
 )
-response = openotp_soap_api.normal_login("testuser1", ldap_password="password", otp_password="123456")
+response = asyncio.run(openotp_soap_api.normal_login("testuser1", ldap_password="password", otp_password="123456"))
+
 ```
 
 More information can be found here: [Manager APIs](https://docs.rcdevs.com/manager-apis/)
