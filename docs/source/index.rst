@@ -9,12 +9,18 @@ Manager API (requesting Server_Status method)
 
 .. code:: python
 
+   import ssl
+   import asyncio
    from pyrcdevs import WebADMManager
 
    webadm_manager_api = WebADMManager(
-        "my_webadm_host_or_ip", "UserDomain\\api_username", "api_password", verify="/path/to/ca_file.crt"
+       "my_webadm_host_or_ip",
+       "UserDomain\\api_username",
+       "api_password",
+       verify_mode=ssl.CERT_REQUIRED,
+       ca_file="/path/to/ca_file.crt"
    )
-   server_status_response = webadm_manager_api.server_status(servers=True, websrvs=True, webapps=True)
+   server_status_response = asyncio.run(webadm_manager_api.server_status(servers=True, websrvs=True, webapps=True))
 
 Output is:
 
@@ -34,29 +40,36 @@ instantiating the WebADM object:
 
 .. code:: python
 
+   import ssl
+   import asyncio
    from pyrcdevs import WebADMManager
 
    webadm_manager_api = WebADMManager(
-        "my_webadm_host_or_ip",
-        "UserDomain\\api_username",
-        "api_password",
-        verify="/path/to/ca_file.crt",
-        p12_file_path="/path/to/p12_file.p12",
-        p12_password="p12_PasSW0rd"
+       "my_webadm_host_or_ip",
+       "UserDomain\\api_username",
+       "api_password",
+       verify_mode=ssl.CERT_REQUIRED,
+       ca_file="/path/to/ca_file.crt",
+       p12_file_path = "/path/to/p12_file.p12",
+       p12_password = "p12_PasSW0rd"
    )
-   server_status_response = webadm_manager_api.server_status()
+   server_status_response = asyncio.run(webadm_manager_api.server_status())
 
 SOAP API (requesting openotpNormalLogin method)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code:: python
 
+   import ssl
+   import asyncio
    from pyrcdevs import OpenOTPSoap
 
    openotp_soap_api = OpenOTPSoap(
-        "my_webadm_host_or_ip", verify="/path/to/ca_file.crt"
+       "my_webadm_host_or_ip",
+       verify_mode=ssl.CERT_REQUIRED,
+       ca_file="/path/to/ca_file.crt"
    )
-   response = openotp_soap_api.normal_login("testuser1", ldap_password="password", otp_password="123456")
+   response = asyncio.run(openotp_soap_api.normal_login("testuser1", ldap_password="password", otp_password="123456"))
 
 Output is:
 
@@ -81,15 +94,18 @@ object:
 
 .. code:: python
 
+   import ssl
+   import asyncio
    from pyrcdevs import OpenOTPSoap
 
    openotp_soap_api = OpenOTPSoap(
        "my_webadm_host_or_ip",
-       verify="/path/to/ca_file.crt",
-       p12_file_path="/path/to/p12_file.p12",
-       p12_password="p12_PasSW0rd"
+       verify_mode=ssl.CERT_REQUIRED,
+       ca_file="/path/to/ca_file.crt",
+       p12_file_path = "/path/to/p12_file.p12",
+       p12_password = "p12_PasSW0rd"
    )
-   response = openotp_soap_api.normal_login("testuser1", ldap_password="password", otp_password="123456")
+   response = asyncio.run(openotp_soap_api.normal_login("testuser1", ldap_password="password", otp_password="123456"))
 
 With API key
 ^^^^^^^^^^^^
@@ -99,14 +115,17 @@ instantiating the OpenOTPSoap object:
 
 .. code:: python
 
+   import ssl
+   import asyncio
    from pyrcdevs import OpenOTPSoap
 
    openotp_soap_api = OpenOTPSoap(
        "my_webadm_host_or_ip",
-       verify="/path/to/ca_file.crt",
+       verify_mode=ssl.CERT_REQUIRED,
+       ca_file="/path/to/ca_file.crt",
        api_key="5860687476061196336_d788fd99ea4868f35c3b5e21ada3920b9501bb2c",
    )
-   response = openotp_soap_api.normal_login("testuser1", ldap_password="password", otp_password="123456")
+   response = asyncio.run(openotp_soap_api.normal_login("testuser1", ldap_password="password", otp_password="123456"))
 
 
 More information can be found here: `Manager APIs <https://docs.rcdevs.com/manager-apis/>`_

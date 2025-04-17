@@ -23,6 +23,7 @@ python-ldap = "^3.4.4"
 pillow = "^11.1.0"
 pytz = "^2025.1"
 m2crypto = "^0.44.0"
+cryptography = "^44.0.2"
 
 [tool.poetry.group.dev.dependencies]
 black = "^24"
