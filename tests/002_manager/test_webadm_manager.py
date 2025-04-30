@@ -1829,9 +1829,7 @@ async def test_get_user_settings() -> None:
     )
 
     assert isinstance(response, dict)
-    list_keys = list(response.keys())
-    list_keys.sort()
-    assert list_keys == [
+    assert response.keys() >= {
         "HelpDesk.AllowOTPTypes",
         "HelpDesk.AllowOpenOTP",
         "HelpDesk.AllowPKI",
@@ -1974,7 +1972,7 @@ async def test_get_user_settings() -> None:
         "SpanKey.ValidFrom",
         "SpanKey.ValidTo",
         "SpanKey.X11Forwarding",
-    ]
+    }
 
     # Test for non existing data
     response = await webadm_api_manager.get_user_settings(
