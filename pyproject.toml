@@ -24,6 +24,7 @@ pillow = "^11.1.0"
 pytz = "^2025.1"
 m2crypto = "^0.44.0"
 cryptography = "^44.0.2"
+pytest-asyncio = "^0.26.0"
 
 [tool.poetry.group.dev.dependencies]
 black = "^24"
@@ -68,6 +69,7 @@ env = [
 filterwarnings = [
     "error",
     "ignore::urllib3.exceptions.InsecureRequestWarning",
+    "ignore::pytest.PytestUnraisableExceptionWarning",
 ]
 
 

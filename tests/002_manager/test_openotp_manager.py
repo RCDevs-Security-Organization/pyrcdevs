@@ -1,7 +1,6 @@
-import asyncio
 import re
 import ssl
-from unittest import skipIf
+import pytest
 
 from pyrcdevs import OpenOTPManager
 from tests.constants import (
@@ -18,36 +17,38 @@ openotp_api_manager = OpenOTPManager(
 )
 
 
-@skipIf(True, "")
-def test_mobile_session() -> None:
+@pytest.mark.skipif(True, reason="")
+@pytest.mark.asyncio
+async def test_mobile_session() -> None:
     """
     Test OpenOTP.Mobile_Session method
     """
 
     # Test mobile session with 120 seconds of timeout
-    response = asyncio.run(openotp_api_manager.mobile_session(120))
+    response = await openotp_api_manager.mobile_session(120)
     assert re.compile(REGEX_SESSION_FORMAT).search(response)
 
     # Test mobile session with 120 seconds of timeout, and
-    response = asyncio.run(openotp_api_manager.mobile_session(120, pincode="123456"))
+    response = await openotp_api_manager.mobile_session(120, pincode="123456")
     assert re.compile(REGEX_SESSION_FORMAT).search(response)
 
     # Test with maldormed DN
     # TODO: check with devs
-    response = asyncio.run(openotp_api_manager.mobile_session(120, dn=RANDOM_STRING))
+    response = await openotp_api_manager.mobile_session(120, dn=RANDOM_STRING)
     assert re.compile(REGEX_SESSION_FORMAT).search(response)
 
 
-@skipIf(True, "")
-def test_domain_report() -> None:
+@pytest.mark.skipif(True, reason="")
+@pytest.mark.asyncio
+async def test_domain_report() -> None:
     """
     Test OpenOTP.Domain_Report method
     """
 
-    response = asyncio.run(openotp_api_manager.domain_report(RANDOM_STRING))
+    response = await openotp_api_manager.domain_report(RANDOM_STRING)
     assert not response
 
-    response = asyncio.run(openotp_api_manager.domain_report("Domain_Enabled"))
+    response = await openotp_api_manager.domain_report("Domain_Enabled")
     assert isinstance(response, dict)
     objects = list(response.keys())
     objects.sort()
