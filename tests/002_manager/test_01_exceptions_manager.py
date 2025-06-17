@@ -63,4 +63,4 @@ async def test_wrong_api_credentials() -> None:
             verify_mode=ssl.CERT_NONE,
             timeout=2,
         ).server_status()
-    assert str(excinfo).startswith("<ExceptionInfo InvalidAPICredentials()")
+    assert str(excinfo).startswith("<ExceptionInfo InvalidAPICredentials(")
