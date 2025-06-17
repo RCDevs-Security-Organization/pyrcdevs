@@ -2172,6 +2172,8 @@ async def test_import_inventory_item() -> None:
         in str(excinfo)
         or 'SQL query error: ERROR: duplicate key value violates unique constraint "Inventory_pkey'
         in str(excinfo)
+        or 'SQL query error: [FreeTDS][SQL Server]Violation of PRIMARY KEY constraint'
+        in str(excinfo)
     )
 
     # Test importing a yubikey with status to expired
