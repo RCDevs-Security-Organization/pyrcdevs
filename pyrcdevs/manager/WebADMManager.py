@@ -1,4 +1,5 @@
 """This module implements WebADM API Manager."""
+
 import ssl
 from enum import Enum
 from typing import Any
@@ -158,6 +159,7 @@ class WebADMManager(Manager):
         timeout: int = 30,
         verify_mode: ssl.VerifyMode = ssl.CERT_REQUIRED,
         ca_file: str | None = None,
+        vhost: str | None = None,
     ) -> None:
         """
         Construct WebADM class.
@@ -171,9 +173,19 @@ class WebADMManager(Manager):
         :param ssl.VerifyMode verify_mode: one of ssl.CERT_NONE, ssl.CERT_OPTIONAL or ssl.CERT_REQUIRED. Default to
         ssl.CERT_REQUIRED
         :param str | None ca_file: path to the CA file for validating server certificate
+        :param str | None vhost: virtual host that will be set as value for Host HTTP header
         """
         super().__init__(
-            host, username, password, p12_file_path, p12_password, timeout, port, verify_mode, ca_file
+            host,
+            username,
+            password,
+            p12_file_path,
+            p12_password,
+            timeout,
+            port,
+            verify_mode,
+            ca_file,
+            vhost,
         )
 
     async def activate_ldap_object(self, dn: str) -> bool:
@@ -185,10 +197,14 @@ class WebADMManager(Manager):
         :rtype: bool
         """
         params = {"dn": dn}
-        response = await super().handle_api_manager_request("Activate_LDAP_Object", params)
+        response = await super().handle_api_manager_request(
+            "Activate_LDAP_Object", params
+        )
         return response
 
-    async def cert_auto_confirm(self, expires, application=None, addresses=None) -> bool:
+    async def cert_auto_confirm(
+        self, expires, application=None, addresses=None
+    ) -> bool:
         """
         Enable the auto configmation mode like in Admin / Issue Certificate.
 
@@ -245,7 +261,9 @@ class WebADMManager(Manager):
         :rtype: bool
         """
         params = {"dn": dn}
-        response = await super().handle_api_manager_request("Check_User_Badging", params)
+        response = await super().handle_api_manager_request(
+            "Check_User_Badging", params
+        )
         return response
 
     async def check_user_password(self, dn, password) -> bool:
@@ -258,7 +276,9 @@ class WebADMManager(Manager):
         :rtype: bool
         """
         params = {"dn": dn, "password": password}
-        response = await super().handle_api_manager_request("Check_User_Password", params)
+        response = await super().handle_api_manager_request(
+            "Check_User_Password", params
+        )
         return response
 
     async def clear_caches(self, type_=None, tenant=None) -> bool:
@@ -293,7 +313,9 @@ class WebADMManager(Manager):
         params = {}
         if product is not None:
             params["product"] = product.value
-        response = await super().handle_api_manager_request("Count_Activated_Hosts", params)
+        response = await super().handle_api_manager_request(
+            "Count_Activated_Hosts", params
+        )
         return response
 
     async def count_activated_users(self, product: LicenseProduct = None) -> int:
@@ -311,7 +333,9 @@ class WebADMManager(Manager):
         params = {}
         if product is not None:
             params["product"] = product.value
-        response = await super().handle_api_manager_request("Count_Activated_Users", params)
+        response = await super().handle_api_manager_request(
+            "Count_Activated_Users", params
+        )
         return response
 
     async def count_domain_users(self, domain, active=None) -> int:
@@ -326,7 +350,9 @@ class WebADMManager(Manager):
         params = {"domain": domain}
         if active is not None:
             params["active"] = active
-        response = await super().handle_api_manager_request("Count_Domain_Users", params)
+        response = await super().handle_api_manager_request(
+            "Count_Domain_Users", params
+        )
         return response
 
     async def create_ldap_object(self, dn: str, attrs: dict) -> bool:
@@ -352,7 +378,9 @@ class WebADMManager(Manager):
         :rtype: bool
         """
         params = {"dn": dn, "attrs": attrs}
-        response = await super().handle_api_manager_request("Create_LDAP_Object", params)
+        response = await super().handle_api_manager_request(
+            "Create_LDAP_Object", params
+        )
         return response
 
     async def deactivate_ldap_object(self, dn) -> bool:
@@ -364,7 +392,9 @@ class WebADMManager(Manager):
         :rtype: bool
         """
         params = {"dn": dn}
-        response = await super().handle_api_manager_request("Deactivate_LDAP_Object", params)
+        response = await super().handle_api_manager_request(
+            "Deactivate_LDAP_Object", params
+        )
         return response
 
     async def get_config_objects(
@@ -394,7 +424,9 @@ class WebADMManager(Manager):
                     MSG_NOT_RIGHT_TYPE.format("application", "ConfigObjectApplication")
                 )
             params["application"] = application.value
-        response = await super().handle_api_manager_request("Get_Config_Objects", params)
+        response = await super().handle_api_manager_request(
+            "Get_Config_Objects", params
+        )
         return response
 
     async def get_event_logs(
@@ -436,7 +468,9 @@ class WebADMManager(Manager):
         params = {}
         if product is not None:
             params["product"] = product.value
-        response = await super().handle_api_manager_request("Get_License_Details", params)
+        response = await super().handle_api_manager_request(
+            "Get_License_Details", params
+        )
         return response
 
     async def get_qrcode(self, uri, size=None, margin=None, format_=None) -> str:
@@ -502,7 +536,9 @@ class WebADMManager(Manager):
         :rtype: list
         """
         params = {"dn": dn}
-        response = await super().handle_api_manager_request("Get_User_Certificates", params)
+        response = await super().handle_api_manager_request(
+            "Get_User_Certificates", params
+        )
         return response
 
     async def get_user_data(self, dn, data=None) -> dict:
@@ -614,7 +650,9 @@ class WebADMManager(Manager):
             params["active"] = active
         if status is not None:
             params["status"] = status.value
-        response = await super().handle_api_manager_request("Import_Inventory_Item", params)
+        response = await super().handle_api_manager_request(
+            "Import_Inventory_Item", params
+        )
         return response
 
     async def link_inventory_item(self, type_, reference, dn=None) -> bool:
@@ -630,7 +668,9 @@ class WebADMManager(Manager):
         params = {"type": type_, "reference": reference}
         if dn is not None:
             params["dn"] = dn
-        response = await super().handle_api_manager_request("Link_Inventory_Item", params)
+        response = await super().handle_api_manager_request(
+            "Link_Inventory_Item", params
+        )
         return response
 
     async def move_ldap_object(self, dn: str, container: str) -> bool:
@@ -655,7 +695,9 @@ class WebADMManager(Manager):
         :rtype: bool
         """
         params = {"dn": dn}
-        response = await super().handle_api_manager_request("Remove_LDAP_Object", params)
+        response = await super().handle_api_manager_request(
+            "Remove_LDAP_Object", params
+        )
         return response
 
     async def remove_user_attrs(self, dn, attrs, values=None) -> bool:
@@ -685,7 +727,9 @@ class WebADMManager(Manager):
         :rtype: bool
         """
         params = {"dn": dn, "certificate": certificate}
-        response = await super().handle_api_manager_request("Remove_User_Certificate", params)
+        response = await super().handle_api_manager_request(
+            "Remove_User_Certificate", params
+        )
         return response
 
     async def rename_ldap_object(self, dn: str, name: str) -> bool:
@@ -698,7 +742,9 @@ class WebADMManager(Manager):
         :rtype: bool
         """
         params = {"dn": dn, "name": name}
-        response = await super().handle_api_manager_request("Rename_LDAP_Object", params)
+        response = await super().handle_api_manager_request(
+            "Rename_LDAP_Object", params
+        )
         return response
 
     async def search_inventory_items(
@@ -739,7 +785,9 @@ class WebADMManager(Manager):
             params["start"] = start
         if stop is not None:
             params["stop"] = stop
-        response = await super().handle_api_manager_request("Search_Inventory_Items", params)
+        response = await super().handle_api_manager_request(
+            "Search_Inventory_Items", params
+        )
         return response
 
     async def search_ldap_objects(
@@ -771,7 +819,9 @@ class WebADMManager(Manager):
             params["scope"] = scope.value
         if attrs is not None:
             params["attrs"] = attrs
-        response = await super().handle_api_manager_request("Search_LDAP_Objects", params)
+        response = await super().handle_api_manager_request(
+            "Search_LDAP_Objects", params
+        )
         return response
 
     async def send_mail(
@@ -799,7 +849,9 @@ class WebADMManager(Manager):
         response = await super().handle_api_manager_request("Send_Mail", params)
         return response
 
-    async def send_push(self, application, to, options=None, data=None, timeout=None) -> bool:
+    async def send_push(
+        self, application, to, options=None, data=None, timeout=None
+    ) -> bool:
         """
         Send a push notification to the specified recipient.
 
@@ -1041,5 +1093,7 @@ class WebADMManager(Manager):
             params["active"] = active
         if status is not None:
             params["status"] = status.value
-        response = await super().handle_api_manager_request("Update_Inventory_Items", params)
+        response = await super().handle_api_manager_request(
+            "Update_Inventory_Items", params
+        )
         return response

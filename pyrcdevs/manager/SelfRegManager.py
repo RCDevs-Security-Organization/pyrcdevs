@@ -49,6 +49,7 @@ class SelfRegManager(Manager):
         timeout: int = 30,
         verify_mode: ssl.VerifyMode = ssl.CERT_REQUIRED,
         ca_file: str | None = None,
+        vhost: str | None = None,
     ) -> None:
         """
         Construct SelfReg class.
@@ -59,6 +60,7 @@ class SelfRegManager(Manager):
         :param int port: listening port of WebADM server
         :param str p12_file_path: path to pkcs12 file used when TLS client auth is required
         :param str p12_password: password of pkcs12 file
+        :param str | None vhost: virtual host that will be set as value for Host HTTP header
         """
         super().__init__(
             host,
@@ -70,6 +72,7 @@ class SelfRegManager(Manager):
             port,
             verify_mode,
             ca_file,
+            vhost
         )
 
     async def send_request(

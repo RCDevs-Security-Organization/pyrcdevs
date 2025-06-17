@@ -85,6 +85,7 @@ class Manager:
         port: int = 443,
         verify_mode: ssl.VerifyMode = ssl.CERT_REQUIRED,
         ca_file: str | None = None,
+        vhost: str | None = None,
     ) -> None:
         """
         Construct Manager class.
@@ -98,6 +99,7 @@ class Manager:
         :param ssl.VerifyMode verify_mode: one of ssl.CERT_NONE, ssl.CERT_OPTIONAL or ssl.CERT_REQUIRED. Default to
         ssl.CERT_REQUIRED
         :param str | None ca_file: path to the CA file for validating server certificate
+        :param str | None vhost: virtual host that will be set as value for Host HTTP header
         """
         self.host = host
         self.port = port
@@ -105,6 +107,7 @@ class Manager:
         self.password = password
         self.verify_mode = verify_mode
         self.ca_file = ca_file
+        self.vhost = vhost
         self.timeout = timeout
         if None not in [p12_file_path, p12_password]:
             self.p12_file_path = p12_file_path
@@ -133,12 +136,16 @@ class Manager:
         if self.ssl_context is None:
             self.ssl_context = await self.create_ssl_context()
 
+        headers = {"Content-Type": "application/json"}
+        if self.vhost is not None:
+            headers["Host"] = self.vhost
+
         async with aiohttp.ClientSession() as session:
             async with session.post(
                 f"https://{self.host}:{self.port}/manag/",
                 ssl=self.ssl_context,
                 json=request_data,
-                headers={"Content-Type": "application/json"},
+                headers=headers,
                 auth=BasicAuth(self.username, self.password),
             ) as response:
                 # Ensure the response is JSON
@@ -154,7 +161,7 @@ class Manager:
             if "code" in json_reponse.get("error").keys():
                 code = json_reponse.get("error").get("code")
                 if code == -32600:
-                    raise InvalidAPICredentials
+                    raise InvalidAPICredentials("Invalid username or password")
                 elif code == -32603:
                     raise InternalError(json_reponse.get("error").get("data"))
                 elif code == -32602:

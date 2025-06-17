@@ -1,4 +1,5 @@
 """This module implements OpenOTP API Manager."""
+
 import ssl
 from enum import Enum
 from typing import Any
@@ -65,6 +66,7 @@ class OpenOTPManager(Manager):
         timeout: int = 30,
         verify_mode: ssl.VerifyMode = ssl.CERT_REQUIRED,
         ca_file: str | None = None,
+        vhost: str | None = None,
     ) -> None:
         """
         Construct OpenOTPManager class.
@@ -78,6 +80,7 @@ class OpenOTPManager(Manager):
         :param ssl.VerifyMode verify_mode: one of ssl.CERT_NONE, ssl.CERT_OPTIONAL or ssl.CERT_REQUIRED. Default to
         ssl.CERT_REQUIRED
         :param str | None ca_file: path to the CA file for validating server certificate
+        :param str | None vhost: virtual host that will be set as value for Host HTTP header
         """
         super().__init__(
             host,
@@ -89,6 +92,7 @@ class OpenOTPManager(Manager):
             port,
             verify_mode,
             ca_file,
+            vhost,
         )
 
     async def appkey_fetch(self, dn) -> list:
@@ -579,11 +583,11 @@ class OpenOTPManager(Manager):
         if state is not None:
             params["state"] = state
         if digits is not None:
-            params["digits"] = digits
+            params["digits"] = str(digits.value)
         if session is not None:
             params["session"] = session
         if tinyurl is not None:
-            params["tinyurl"] = tinyurl
+            params["tinyurl"] = str(tinyurl)
         response = await super().handle_api_manager_request("OpenOTP.HOTP_URI", params)
         return response
 
@@ -996,13 +1000,13 @@ class OpenOTPManager(Manager):
             raise TypeError("digits type is not TOTPURIDigits")
         params = {"name": name, "key": key, "userid": userid, "domain": domain}
         if period is not None:
-            params["period"] = period
+            params["period"] = str(period)
         if digits is not None:
-            params["digits"] = digits
+            params["digits"] = str(digits.value)
         if session is not None:
             params["session"] = session
         if tinyurl is not None:
-            params["tinyurl"] = tinyurl
+            params["tinyurl"] = str(tinyurl)
         response = await super().handle_api_manager_request("OpenOTP.TOTP_URI", params)
         return response
 

@@ -40,6 +40,7 @@ class OpenOTPSoap(SOAP):
         timeout: int = 30,
         verify_mode: ssl.VerifyMode = ssl.CERT_REQUIRED,
         ca_file: str | None = None,
+        vhost: str | None = None,
     ) -> None:
         """
         Construct OpenOTPSoap class.
@@ -53,6 +54,7 @@ class OpenOTPSoap(SOAP):
         :param ssl.VerifyMode verify_mode: one of ssl.CERT_NONE, ssl.CERT_OPTIONAL or ssl.CERT_REQUIRED. Default to
         ssl.CERT_REQUIRED
         :param str | None ca_file: path to the CA file for validating server certificate
+        :param str | None vhost: virtual host that will be set as value for Host HTTP header
         """
         super().__init__(
             host,
@@ -64,6 +66,7 @@ class OpenOTPSoap(SOAP):
             timeout,
             verify_mode,
             ca_file,
+            vhost
         )
 
     async def simple_login(

@@ -72,6 +72,7 @@ class SOAP:
         timeout: int = 10,
         verify_mode: ssl.VerifyMode = ssl.CERT_REQUIRED,
         ca_file: str | None = None,
+        vhost: str | None = None,
     ) -> None:
         """
         Construct Manager class.
@@ -86,6 +87,7 @@ class SOAP:
         :param ssl.VerifyMode verify_mode: one of ssl.CERT_NONE, ssl.CERT_OPTIONAL or ssl.CERT_REQUIRED. Default to
         ssl.CERT_REQUIRED
         :param str | None ca_file: path to the CA file for validating server certificate
+        :param str | None vhost: virtual host that will be set as value for Host HTTP header
         """
         self.host = host
         self.verify_mode = verify_mode
@@ -93,6 +95,7 @@ class SOAP:
         self.service = service.lower()
         self.port = port
         self.timeout = timeout
+        self.vhost = vhost
         if (
             p12_file_path is not None or p12_password is not None
         ) and api_key is not None:
@@ -127,6 +130,9 @@ class SOAP:
         headers = {"Content-Type": "application/xml"}
         if self.api_key and not self.client_auth:
             headers["WA-API-Key"] = self.api_key
+
+        if self.vhost is not None:
+            headers["Host"] = self.vhost
 
         if self.ssl_context is None:
             self.ssl_context = await self.create_ssl_context()

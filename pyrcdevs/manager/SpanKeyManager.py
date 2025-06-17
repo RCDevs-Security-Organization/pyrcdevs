@@ -47,6 +47,7 @@ class SpanKeyManager(Manager):
         timeout: int = 30,
         verify_mode: ssl.VerifyMode = ssl.CERT_REQUIRED,
         ca_file: str | None = None,
+        vhost: str | None = None,
     ) -> None:
         """
         Construct SpanKey class.
@@ -60,6 +61,7 @@ class SpanKeyManager(Manager):
         :param ssl.VerifyMode verify_mode: one of ssl.CERT_NONE, ssl.CERT_OPTIONAL or ssl.CERT_REQUIRED. Default to
         ssl.CERT_REQUIRED
         :param str | None ca_file: path to the CA file for validating server certificate
+        :param str | None vhost: virtual host that will be set as value for Host HTTP header
         """
         super().__init__(
             host,
@@ -71,6 +73,7 @@ class SpanKeyManager(Manager):
             port,
             verify_mode,
             ca_file,
+            vhost
         )
 
     async def key_register(self, dn, type_, size=None, expires=None, maxuse=None) -> Any:
